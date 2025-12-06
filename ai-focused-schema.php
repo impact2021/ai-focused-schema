@@ -265,7 +265,7 @@ add_action( 'admin_init', function() {
 			}
 
 			// Basic string fields.
-			$string_fields = array( 'name', 'url', 'telephone', 'email', 'description', 'image', 'logo', 'priceRange' );
+			$string_fields = array( 'name', 'url', 'telephone', 'email', 'description', 'image', 'logo', 'priceRange', 'category' );
 			foreach ( $string_fields as $field ) {
 				if ( isset( $input[ $field ] ) ) {
 					$value = sanitize_text_field( $input[ $field ] );
@@ -337,6 +337,41 @@ add_action( 'admin_init', function() {
 					}
 				} elseif ( isset( $schema['sameAs'] ) ) {
 					unset( $schema['sameAs'] );
+				}
+			}
+
+			// Founder.
+			if ( isset( $input['founder'] ) && is_array( $input['founder'] ) ) {
+				$founder_input = $input['founder'];
+				if ( ! empty( $founder_input['name'] ) ) {
+					$schema['founder'] = array(
+						'@type' => 'Person',
+						'name'  => sanitize_text_field( $founder_input['name'] ),
+					);
+				} elseif ( isset( $schema['founder'] ) ) {
+					unset( $schema['founder'] );
+				}
+			}
+
+			// ContactPoint.
+			if ( isset( $input['contactPoint'] ) && is_array( $input['contactPoint'] ) ) {
+				$contact_input = $input['contactPoint'];
+				$contact_point = array( '@type' => 'ContactPoint' );
+				
+				if ( ! empty( $contact_input['telephone'] ) ) {
+					$contact_point['telephone'] = sanitize_text_field( $contact_input['telephone'] );
+				}
+				if ( ! empty( $contact_input['contactType'] ) ) {
+					$contact_point['contactType'] = sanitize_text_field( $contact_input['contactType'] );
+				}
+				if ( ! empty( $contact_input['areaServed'] ) ) {
+					$contact_point['areaServed'] = sanitize_text_field( $contact_input['areaServed'] );
+				}
+				
+				if ( count( $contact_point ) > 1 ) {
+					$schema['contactPoint'] = $contact_point;
+				} elseif ( isset( $schema['contactPoint'] ) ) {
+					unset( $schema['contactPoint'] );
 				}
 			}
 
@@ -500,6 +535,7 @@ function aifs_admin_page() {
 	$image           = isset( $schema['image'] ) ? $schema['image'] : '';
 	$logo            = isset( $schema['logo'] ) ? $schema['logo'] : '';
 	$price_range     = isset( $schema['priceRange'] ) ? $schema['priceRange'] : '';
+	$category        = isset( $schema['category'] ) ? $schema['category'] : '';
 
 	// Address.
 	$street_address   = isset( $schema['address']['streetAddress'] ) ? $schema['address']['streetAddress'] : '';
@@ -530,6 +566,14 @@ function aifs_admin_page() {
 			$same_as = $schema['sameAs'];
 		}
 	}
+
+	// Founder.
+	$founder_name = isset( $schema['founder']['name'] ) ? $schema['founder']['name'] : '';
+
+	// ContactPoint.
+	$contact_telephone   = isset( $schema['contactPoint']['telephone'] ) ? $schema['contactPoint']['telephone'] : '';
+	$contact_type        = isset( $schema['contactPoint']['contactType'] ) ? $schema['contactPoint']['contactType'] : '';
+	$contact_area_served = isset( $schema['contactPoint']['areaServed'] ) ? $schema['contactPoint']['areaServed'] : '';
 
 	// Generate JSON preview.
 	$json_preview = ! empty( $schema ) ? wp_json_encode( $schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) : '{}';
@@ -575,6 +619,13 @@ function aifs_admin_page() {
 					<td><input type="text" id="aifs_name" name="aifs[name]" value="<?php echo esc_attr( $name ); ?>" /></td>
 				</tr>
 				<tr>
+					<th><label for="aifs_category">Category</label></th>
+					<td>
+						<input type="text" id="aifs_category" name="aifs[category]" value="<?php echo esc_attr( $category ); ?>" placeholder="e.g., Web Design and Digital Services" />
+						<p class="description">Helps Google better classify your business.</p>
+					</td>
+				</tr>
+				<tr>
 					<th><label for="aifs_description">Description</label></th>
 					<td><textarea id="aifs_description" name="aifs[description]" rows="3"><?php echo esc_textarea( $description ); ?></textarea></td>
 				</tr>
@@ -600,7 +651,10 @@ function aifs_admin_page() {
 				</tr>
 				<tr>
 					<th><label for="aifs_priceRange">Price Range</label></th>
-					<td><input type="text" id="aifs_priceRange" name="aifs[priceRange]" value="<?php echo esc_attr( $price_range ); ?>" placeholder="e.g., $$" /></td>
+					<td>
+						<input type="text" id="aifs_priceRange" name="aifs[priceRange]" value="<?php echo esc_attr( $price_range ); ?>" placeholder="e.g., $$" />
+						<p class="description">Use $ symbols (e.g., $, $$, $$$, $$$$) to indicate pricing level.</p>
+					</td>
 				</tr>
 			</table>
 
@@ -656,8 +710,43 @@ function aifs_admin_page() {
 				<tr>
 					<th><label for="aifs_sameas">sameAs URLs</label></th>
 					<td>
-						<textarea id="aifs_sameas" name="aifs[sameAs]" rows="4" placeholder="https://facebook.com/yourbusiness&#10;https://twitter.com/yourbusiness"><?php echo esc_textarea( $same_as ); ?></textarea>
-						<p class="description">One URL per line (Facebook, Twitter, LinkedIn, etc.)</p>
+						<textarea id="aifs_sameas" name="aifs[sameAs]" rows="4" placeholder="https://www.facebook.com/yourbusiness&#10;https://www.linkedin.com/company/yourbusiness&#10;https://www.instagram.com/yourbusiness"><?php echo esc_textarea( $same_as ); ?></textarea>
+						<p class="description">One URL per line. Include Facebook, LinkedIn, Instagram, YouTube, or other social profiles to enhance AI understanding.</p>
+					</td>
+				</tr>
+			</table>
+
+			<h3>Founder (Optional)</h3>
+			<table class="form-table aifs-form-table">
+				<tr>
+					<th><label for="aifs_founder_name">Founder Name</label></th>
+					<td>
+						<input type="text" id="aifs_founder_name" name="aifs[founder][name]" value="<?php echo esc_attr( $founder_name ); ?>" placeholder="e.g., John Smith" />
+						<p class="description">Adding a founder can signal authority and credibility.</p>
+					</td>
+				</tr>
+			</table>
+
+			<h3>Contact Point (Optional)</h3>
+			<table class="form-table aifs-form-table">
+				<tr>
+					<th><label for="aifs_contact_telephone">Telephone</label></th>
+					<td>
+						<input type="tel" id="aifs_contact_telephone" name="aifs[contactPoint][telephone]" value="<?php echo esc_attr( $contact_telephone ); ?>" placeholder="e.g., +64-21-055-9077" />
+					</td>
+				</tr>
+				<tr>
+					<th><label for="aifs_contact_type">Contact Type</label></th>
+					<td>
+						<input type="text" id="aifs_contact_type" name="aifs[contactPoint][contactType]" value="<?php echo esc_attr( $contact_type ); ?>" placeholder="e.g., customer service" />
+						<p class="description">Type of contact (e.g., customer service, sales, support).</p>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="aifs_contact_area">Area Served</label></th>
+					<td>
+						<input type="text" id="aifs_contact_area" name="aifs[contactPoint][areaServed]" value="<?php echo esc_attr( $contact_area_served ); ?>" placeholder="e.g., NZ" />
+						<p class="description">Geographic area served (e.g., NZ, US, GB).</p>
 					</td>
 				</tr>
 			</table>
