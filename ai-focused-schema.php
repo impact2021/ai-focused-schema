@@ -368,6 +368,7 @@ add_action( 'admin_init', function() {
 					$contact_point['areaServed'] = sanitize_text_field( $contact_input['areaServed'] );
 				}
 
+				// Only add contactPoint if there are fields beyond @type.
 				if ( count( $contact_point ) > 1 ) {
 					$schema['contactPoint'] = $contact_point;
 				} elseif ( isset( $schema['contactPoint'] ) ) {
