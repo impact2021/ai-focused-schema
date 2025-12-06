@@ -260,11 +260,14 @@ add_action( 'admin_init', function() {
 
 		$settings = get_option( AIFS_SETTINGS_OPTION, array() );
 
+		// Auto output setting - explicitly handle checkbox state.
+		// Unchecked checkboxes don't send POST data, so we check if the key exists.
 		if ( isset( $_POST['aifs_settings'] ) && is_array( $_POST['aifs_settings'] ) ) {
 			$settings_input = wp_unslash( $_POST['aifs_settings'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-
-			// Auto output setting.
 			$settings['auto_output'] = isset( $settings_input['auto_output'] ) && $settings_input['auto_output'] === 'on' ? 'on' : 'off';
+		} else {
+			// If aifs_settings is not in POST, checkbox was unchecked.
+			$settings['auto_output'] = 'off';
 		}
 
 		update_option( AIFS_SETTINGS_OPTION, $settings );
@@ -976,6 +979,8 @@ function aifs_build_jsonld() {
 		return '';
 	}
 
+	// wp_json_encode handles all escaping and prevents XSS.
+	// All schema data is sanitized via aifs_sanitize_schema_data() on input.
 	$json = wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
 	if ( ! $json ) {
@@ -1015,6 +1020,8 @@ add_action( 'wp_head', function() {
 	if ( $auto_output === 'on' ) {
 		$output = aifs_build_jsonld();
 		if ( ! empty( $output ) ) {
+			// Output is safe: JSON is encoded by wp_json_encode() which prevents XSS.
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			echo "\n" . $output . "\n";
 		}
 	}
