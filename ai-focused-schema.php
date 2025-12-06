@@ -26,7 +26,6 @@ register_activation_hook( __FILE__, function() {
 			'api_key' => '',
 			'place_id' => '',
 			'last_sync' => '',
-			'auto_sync' => false,
 		) );
 	}
 } );
@@ -381,6 +380,7 @@ function aifs_fetch_gmb_reviews() {
 	}
 	
 	// Build the Google Places API request URL.
+	// Note: Google Places API requires the key as a URL parameter per their API documentation.
 	$url = add_query_arg(
 		array(
 			'place_id' => $place_id,
@@ -464,15 +464,17 @@ function aifs_fetch_gmb_reviews() {
 		}
 	}
 	
+	// Update schema if reviews were imported.
 	if ( $imported_count > 0 ) {
 		// Update aggregate rating.
 		aifs_update_aggregate_rating( $schema );
 		update_option( AIFS_OPTION, $schema );
-		
-		// Update last sync time.
-		$gmb_settings['last_sync'] = current_time( 'mysql' );
-		update_option( AIFS_GMB_OPTION, $gmb_settings );
 	}
+	
+	// Update last sync time regardless of whether reviews were imported.
+	// This helps track API calls and debugging even when no new reviews are found.
+	$gmb_settings['last_sync'] = current_time( 'mysql' );
+	update_option( AIFS_GMB_OPTION, $gmb_settings );
 	
 	return $imported_count;
 }
