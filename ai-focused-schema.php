@@ -366,6 +366,14 @@ add_action( 'admin_init', function() {
 
 /**
  * Fetch reviews from Google My Business via Google Places API.
+ * 
+ * Note: Google Places API has a hard limit of 5 reviews per location.
+ * This is a Google API restriction and cannot be changed. The API returns
+ * the 5 "most relevant" reviews as determined by Google's algorithm.
+ * 
+ * For business owners who need access to all reviews, consider using the
+ * Google Business Profile API (formerly My Business API) which requires
+ * verification and provides access to all reviews with pagination.
  *
  * @return int|WP_Error Number of reviews imported on success, WP_Error on failure.
  */
@@ -679,6 +687,9 @@ function aifs_admin_page() {
 		<!-- Google My Business Settings Section -->
 		<h2>Google My Business Integration</h2>
 		<p>Connect your Google My Business account to automatically import reviews. You'll need a Google Places API key and your Place ID.</p>
+		<div class="notice notice-info inline">
+			<p><strong>Note:</strong> The Google Places API has a limit of 5 reviews per location. This is a Google API restriction. If you need access to all reviews, consider using the <a href="https://developers.google.com/my-business/content/review-data" target="_blank">Google Business Profile API</a> (requires business verification and approval).</p>
+		</div>
 		
 		<?php
 		$gmb_settings = get_option( AIFS_GMB_OPTION, array() );

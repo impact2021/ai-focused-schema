@@ -48,6 +48,14 @@ To automatically import reviews from Google My Business:
    - Aggregate ratings are calculated automatically
    - You can also add manual reviews alongside imported ones
 
+#### Important: Review Limit
+
+**The Google Places API returns a maximum of 5 reviews per location.** This is a hard limit imposed by Google and cannot be changed. The API returns the 5 "most relevant" reviews as determined by Google's algorithm, not necessarily the most recent or highest rated.
+
+**Alternatives for accessing more reviews:**
+- **Google Business Profile API** (formerly My Business API): If you are the verified business owner, you can apply for access to this API which allows you to retrieve all reviews with pagination (up to 50 per page). Note that approval can take several weeks.
+- **Manual Entry**: You can always add additional reviews manually through the plugin's review management interface.
+
 ### Manual Review Management
 
 You can add reviews manually in the **Customer Reviews** section:
