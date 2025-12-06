@@ -558,7 +558,7 @@ function aifs_admin_page() {
 			?>
 				<p><strong>Aggregate Rating:</strong> 
 					<?php echo esc_html( $agg_rating['ratingValue'] ); ?> out of 5 
-					(<?php echo esc_html( $agg_rating['ratingCount'] ); ?> review<?php echo $agg_rating['ratingCount'] !== 1 ? 's' : ''; ?>)
+					(<?php echo esc_html( $agg_rating['ratingCount'] ); ?> review<?php echo ( (int) $agg_rating['ratingCount'] ) !== 1 ? 's' : ''; ?>)
 				</p>
 			<?php endif; ?>
 		<?php endif; ?>
