@@ -72,6 +72,12 @@ add_action( 'admin_init', function() {
 		}
 
 		$json_input = isset( $_POST['aifs_json_input'] ) ? wp_unslash( $_POST['aifs_json_input'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		
+		// Strip <script> tags if user pasted complete HTML snippet.
+		$json_input = preg_replace( '/<script[^>]*>/i', '', $json_input );
+		$json_input = preg_replace( '/<\/script>/i', '', $json_input );
+		$json_input = trim( $json_input );
+		
 		$parsed = json_decode( $json_input, true );
 
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
