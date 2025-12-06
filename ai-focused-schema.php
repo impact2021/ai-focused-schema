@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'AIFS_OPTION', 'aifs_schema_data' );
 define( 'AIFS_GMB_OPTION', 'aifs_gmb_settings' );
+define( 'AIFS_SETTINGS_OPTION', 'aifs_plugin_settings' );
 
 /**
  * Activation: set up default option.
@@ -28,26 +29,33 @@ register_activation_hook( __FILE__, function() {
 			'last_sync' => '',
 		) );
 	}
+	if ( ! get_option( AIFS_SETTINGS_OPTION ) ) {
+		add_option( AIFS_SETTINGS_OPTION, array(
+			'auto_output' => 'on', // Enable by default for SEOPress compatibility
+		) );
+	}
 } );
 
 /**
- * Admin menu: single page under Settings.
+ * Admin menu: top-level menu item.
  */
 add_action( 'admin_menu', function() {
-	add_options_page(
-		'AI Focused Schema',
-		'AI Focused Schema',
-		'manage_options',
-		'ai-focused-schema',
-		'aifs_admin_page'
+	add_menu_page(
+		'AI Focused Schema',           // Page title
+		'AI Schema',                    // Menu title
+		'manage_options',               // Capability
+		'ai-focused-schema',            // Menu slug
+		'aifs_admin_page',              // Callback function
+		'dashicons-code-standards',     // Icon
+		30                              // Position (after Comments)
 	);
 } );
 
 /**
- * Enqueue admin styles for the settings page.
+ * Enqueue admin styles for the plugin page.
  */
 add_action( 'admin_enqueue_scripts', function( $hook ) {
-	if ( 'settings_page_ai-focused-schema' !== $hook ) {
+	if ( 'toplevel_page_ai-focused-schema' !== $hook ) {
 		return;
 	}
 	wp_add_inline_style( 'wp-admin', '
@@ -239,6 +247,28 @@ add_action( 'admin_init', function() {
 		} else {
 			add_settings_error( 'aifs_messages', 'aifs_gmb_success', 'Successfully imported ' . $result . ' review(s) from Google My Business!', 'success' );
 		}
+		return;
+	}
+
+	// Handle plugin settings save.
+	if ( isset( $_POST['aifs_save_settings'] ) ) {
+		$nonce = isset( $_POST['aifs_settings_nonce'] ) ? wp_unslash( $_POST['aifs_settings_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		if ( ! wp_verify_nonce( $nonce, 'aifs_settings_action' ) ) {
+			add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
+			return;
+		}
+
+		$settings = get_option( AIFS_SETTINGS_OPTION, array() );
+
+		if ( isset( $_POST['aifs_settings'] ) && is_array( $_POST['aifs_settings'] ) ) {
+			$settings_input = wp_unslash( $_POST['aifs_settings'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+
+			// Auto output setting.
+			$settings['auto_output'] = isset( $settings_input['auto_output'] ) && $settings_input['auto_output'] === 'on' ? 'on' : 'off';
+		}
+
+		update_option( AIFS_SETTINGS_OPTION, $settings );
+		add_settings_error( 'aifs_messages', 'aifs_settings_success', 'Plugin settings saved successfully!', 'success' );
 		return;
 	}
 
@@ -588,6 +618,33 @@ function aifs_admin_page() {
 		<div class="aifs-shortcode-info">
 			<strong>Shortcode:</strong> Use <code>[ai_schema]</code> in your Divi footer (or anywhere else) to output the schema.
 		</div>
+
+		<!-- Plugin Settings Section -->
+		<h2>Plugin Settings</h2>
+		<?php
+		$plugin_settings = get_option( AIFS_SETTINGS_OPTION, array() );
+		$auto_output = isset( $plugin_settings['auto_output'] ) ? $plugin_settings['auto_output'] : 'on';
+		?>
+		<form method="post">
+			<?php wp_nonce_field( 'aifs_settings_action', 'aifs_settings_nonce' ); ?>
+			<table class="form-table aifs-form-table">
+				<tr>
+					<th><label for="aifs_auto_output">Automatic Schema Output</label></th>
+					<td>
+						<label>
+							<input type="checkbox" id="aifs_auto_output" name="aifs_settings[auto_output]" value="on" <?php checked( $auto_output, 'on' ); ?> />
+							Automatically output schema in the page &lt;head&gt; section
+						</label>
+						<p class="description">
+							<strong>Recommended: Keep this enabled</strong> for SEOPress PRO and other SEO tools to detect your schema.<br>
+							When enabled, schema is automatically added to every page via wp_head.<br>
+							The shortcode <code>[ai_schema]</code> will still work for manual placement if needed.
+						</p>
+					</td>
+				</tr>
+			</table>
+			<?php submit_button( 'Save Settings', 'primary', 'aifs_save_settings' ); ?>
+		</form>
 
 		<!-- JSON Upload Section -->
 		<div class="aifs-json-upload">
@@ -946,6 +1003,22 @@ add_shortcode( 'ai_entity_profile', function() {
 add_shortcode( 'impact_gbp_schema', function() {
 	return aifs_build_jsonld();
 } );
+
+/**
+ * Automatically output schema in wp_head if enabled.
+ * This ensures SEOPress PRO and other tools can detect the schema.
+ */
+add_action( 'wp_head', function() {
+	$settings = get_option( AIFS_SETTINGS_OPTION, array() );
+	$auto_output = isset( $settings['auto_output'] ) ? $settings['auto_output'] : 'on';
+
+	if ( $auto_output === 'on' ) {
+		$output = aifs_build_jsonld();
+		if ( ! empty( $output ) ) {
+			echo "\n" . $output . "\n";
+		}
+	}
+}, 1 ); // Priority 1 to output early in the head section.
 
 /**
  * Update aggregate rating based on reviews.
