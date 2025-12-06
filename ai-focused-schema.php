@@ -68,7 +68,8 @@ add_action( 'admin_init', function() {
 } );
 
 function iaep_sanitize( $in ) {
-	$out = get_option( IAEP_OPTION, array() );
+	$current_opts = get_option( IAEP_OPTION, array() );
+	$out = $current_opts;
 	$out['place_id'] = isset( $in['place_id'] ) ? sanitize_text_field( $in['place_id'] ) : $out['place_id'];
 	$out['api_key']  = isset( $in['api_key'] ) ? sanitize_text_field( $in['api_key'] ) : $out['api_key'];
 	$out['cache_ttl']= isset( $in['cache_ttl'] ) ? intval( $in['cache_ttl'] ) : $out['cache_ttl'];
@@ -83,14 +84,21 @@ function iaep_sanitize( $in ) {
 	$out['country']  = isset( $in['country'] ) ? sanitize_text_field( $in['country'] ) : $out['country'];
 	$out['latitude'] = isset( $in['latitude'] ) ? sanitize_text_field( $in['latitude'] ) : $out['latitude'];
 	$out['longitude']= isset( $in['longitude'] ) ? sanitize_text_field( $in['longitude'] ) : $out['longitude'];
-	$out['sameAs']   = isset( $in['sameAs'] ) ? wp_kses_post( $in['sameAs'] ) : $out['sameAs'];
+	$out['sameAs']   = isset( $in['sameAs'] ) ? sanitize_textarea_field( $in['sameAs'] ) : $out['sameAs'];
 	$out['offers_detect'] = isset( $in['offers_detect'] ) ? intval( $in['offers_detect'] ) : 0;
-	$out['offers_manual'] = isset( $in['offers_manual'] ) ? $in['offers_manual'] : $out['offers_manual'];
+	// Validate offers_manual is valid JSON before storing.
+	if ( isset( $in['offers_manual'] ) ) {
+		$decoded = json_decode( $in['offers_manual'], true );
+		if ( null !== $decoded || '[]' === trim( $in['offers_manual'] ) || 'null' === trim( $in['offers_manual'] ) ) {
+			$out['offers_manual'] = wp_json_encode( $decoded );
+		}
+		// If invalid JSON, keep the old value.
+	}
 	$out['reviews_sort'] = isset( $in['reviews_sort'] ) ? sanitize_text_field( $in['reviews_sort'] ) : ( isset( $out['reviews_sort'] ) ? $out['reviews_sort'] : 'newest' );
 	$out['reviews_refresh_interval'] = isset( $in['reviews_refresh_interval'] ) ? sanitize_text_field( $in['reviews_refresh_interval'] ) : ( isset( $out['reviews_refresh_interval'] ) ? $out['reviews_refresh_interval'] : 'daily' );
 
 	// Reschedule cron if interval changed.
-	$old_interval = isset( $out['reviews_refresh_interval'] ) ? $out['reviews_refresh_interval'] : 'daily';
+	$old_interval = isset( $current_opts['reviews_refresh_interval'] ) ? $current_opts['reviews_refresh_interval'] : 'daily';
 	$new_interval = $out['reviews_refresh_interval'];
 	if ( $old_interval !== $new_interval ) {
 		wp_clear_scheduled_hook( IAEP_CRON_HOOK );
@@ -186,7 +194,8 @@ function iaep_settings_page() {
 /* Refresh handler */
 add_action( 'admin_init', function() {
 	if ( isset( $_POST['iaep_refresh'] ) && current_user_can( 'manage_options' ) ) {
-		if ( ! isset( $_POST['iaep_refresh_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['iaep_refresh_nonce'] ) ), 'iaep_refresh_action' ) ) {
+		$nonce = isset( $_POST['iaep_refresh_nonce'] ) ? wp_unslash( $_POST['iaep_refresh_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce verification requires raw value.
+		if ( ! wp_verify_nonce( $nonce, 'iaep_refresh_action' ) ) {
 			return;
 		}
 		$opts = get_option( IAEP_OPTION );
