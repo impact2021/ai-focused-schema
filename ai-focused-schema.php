@@ -13,6 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'IAEP_OPTION', 'iaep_settings' );
 define( 'IAEP_TRANSIENT_PREFIX', 'iaep_jsonld_' );
+define( 'IAEP_REVIEWS_OPTION', 'iaep_stored_reviews' );
+define( 'IAEP_CRON_HOOK', 'iaep_refresh_reviews_cron' );
 
 /* Activation defaults */
 register_activation_hook( __FILE__, function() {
@@ -34,10 +36,25 @@ register_activation_hook( __FILE__, function() {
 		'sameAs'       => '',
 		'offers_detect' => 1,
 		'offers_manual' => '[]',
+		'reviews_sort'  => 'newest',
+		'reviews_refresh_interval' => 'daily',
 	);
 	if ( ! get_option( IAEP_OPTION ) ) {
 		add_option( IAEP_OPTION, $defaults );
 	}
+	// Initialize stored reviews option.
+	if ( ! get_option( IAEP_REVIEWS_OPTION ) ) {
+		add_option( IAEP_REVIEWS_OPTION, array() );
+	}
+	// Schedule cron job for periodic review refresh.
+	if ( ! wp_next_scheduled( IAEP_CRON_HOOK ) ) {
+		wp_schedule_event( time(), 'daily', IAEP_CRON_HOOK );
+	}
+} );
+
+/* Deactivation: clean up cron */
+register_deactivation_hook( __FILE__, function() {
+	wp_clear_scheduled_hook( IAEP_CRON_HOOK );
 } );
 
 /* Admin menu */
@@ -69,6 +86,17 @@ function iaep_sanitize( $in ) {
 	$out['sameAs']   = isset( $in['sameAs'] ) ? wp_kses_post( $in['sameAs'] ) : $out['sameAs'];
 	$out['offers_detect'] = isset( $in['offers_detect'] ) ? intval( $in['offers_detect'] ) : 0;
 	$out['offers_manual'] = isset( $in['offers_manual'] ) ? $in['offers_manual'] : $out['offers_manual'];
+	$out['reviews_sort'] = isset( $in['reviews_sort'] ) ? sanitize_text_field( $in['reviews_sort'] ) : ( isset( $out['reviews_sort'] ) ? $out['reviews_sort'] : 'newest' );
+	$out['reviews_refresh_interval'] = isset( $in['reviews_refresh_interval'] ) ? sanitize_text_field( $in['reviews_refresh_interval'] ) : ( isset( $out['reviews_refresh_interval'] ) ? $out['reviews_refresh_interval'] : 'daily' );
+
+	// Reschedule cron if interval changed.
+	$old_interval = isset( $out['reviews_refresh_interval'] ) ? $out['reviews_refresh_interval'] : 'daily';
+	$new_interval = $out['reviews_refresh_interval'];
+	if ( $old_interval !== $new_interval ) {
+		wp_clear_scheduled_hook( IAEP_CRON_HOOK );
+		wp_schedule_event( time(), $new_interval, IAEP_CRON_HOOK );
+	}
+
 	return $out;
 }
 
@@ -76,6 +104,9 @@ function iaep_sanitize( $in ) {
 function iaep_settings_page() {
 	if ( ! current_user_can( 'manage_options' ) ) return;
 	$opts = get_option( IAEP_OPTION );
+	$stored_reviews = get_option( IAEP_REVIEWS_OPTION, array() );
+	$review_count = is_array( $stored_reviews ) ? count( $stored_reviews ) : 0;
+	$next_refresh = wp_next_scheduled( IAEP_CRON_HOOK );
 	?>
 	<div class="wrap">
 	<h1>AI Focused Schema</h1>
@@ -103,12 +134,49 @@ function iaep_settings_page() {
 			<tr><th>Auto-detect /services/ offers</th><td><input type="checkbox" name="<?php echo esc_attr( IAEP_OPTION ); ?>[offers_detect]" value="1" <?php checked( 1, $opts['offers_detect'] ); ?> /></td></tr>
 			<tr><th>Manual offers (JSON array)</th><td><textarea name="<?php echo esc_attr( IAEP_OPTION ); ?>[offers_manual]" rows="6" cols="60"><?php echo esc_textarea( $opts['offers_manual'] ); ?></textarea></td></tr>
 		</table>
+
+		<h2>Reviews Settings</h2>
+		<table class="form-table">
+			<tr>
+				<th>Stored Reviews</th>
+				<td>
+					<strong><?php echo esc_html( $review_count ); ?></strong> reviews stored
+					<?php if ( $next_refresh ) : ?>
+						<br/><small>Next auto-refresh: <?php echo esc_html( get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $next_refresh ), 'Y-m-d H:i:s' ) ); ?></small>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th>Review Sort Order</th>
+				<td>
+					<select name="<?php echo esc_attr( IAEP_OPTION ); ?>[reviews_sort]">
+						<option value="newest" <?php selected( isset( $opts['reviews_sort'] ) ? $opts['reviews_sort'] : 'newest', 'newest' ); ?>>Newest first</option>
+						<option value="highest" <?php selected( isset( $opts['reviews_sort'] ) ? $opts['reviews_sort'] : 'newest', 'highest' ); ?>>Highest rated first</option>
+						<option value="most_relevant" <?php selected( isset( $opts['reviews_sort'] ) ? $opts['reviews_sort'] : 'newest', 'most_relevant' ); ?>>Most relevant (Google default)</option>
+					</select>
+					<p class="description">How to sort reviews in the schema output.</p>
+				</td>
+			</tr>
+			<tr>
+				<th>Auto-Refresh Interval</th>
+				<td>
+					<select name="<?php echo esc_attr( IAEP_OPTION ); ?>[reviews_refresh_interval]">
+						<option value="hourly" <?php selected( isset( $opts['reviews_refresh_interval'] ) ? $opts['reviews_refresh_interval'] : 'daily', 'hourly' ); ?>>Hourly</option>
+						<option value="twicedaily" <?php selected( isset( $opts['reviews_refresh_interval'] ) ? $opts['reviews_refresh_interval'] : 'daily', 'twicedaily' ); ?>>Twice daily</option>
+						<option value="daily" <?php selected( isset( $opts['reviews_refresh_interval'] ) ? $opts['reviews_refresh_interval'] : 'daily', 'daily' ); ?>>Daily</option>
+						<option value="weekly" <?php selected( isset( $opts['reviews_refresh_interval'] ) ? $opts['reviews_refresh_interval'] : 'daily', 'weekly' ); ?>>Weekly</option>
+					</select>
+					<p class="description">How often to automatically check for new reviews from Google.</p>
+				</td>
+			</tr>
+		</table>
 		<?php submit_button(); ?>
 	</form>
 
 	<form method="post" style="margin-top:1em;">
 		<?php wp_nonce_field( 'iaep_refresh_action', 'iaep_refresh_nonce' ); ?>
-		<?php submit_button( 'Refresh now (clear cache)', 'secondary', 'iaep_refresh' ); ?>
+		<?php submit_button( 'Fetch New Reviews Now', 'secondary', 'iaep_refresh' ); ?>
+		<p class="description">Clears the cache and fetches fresh data including any new reviews from Google.</p>
 	</form>
 
 	</div>
@@ -124,8 +192,160 @@ add_action( 'admin_init', function() {
 		$opts = get_option( IAEP_OPTION );
 		$key = IAEP_TRANSIENT_PREFIX . ( ! empty( $opts['place_id'] ) ? md5( $opts['place_id'] ) : 'fallback' );
 		delete_transient( $key );
-		add_settings_error( 'iaep_messages', 'iaep_refreshed', 'Cache cleared. Next page load will fetch fresh data.' );
+		// Also trigger a review fetch.
+		$new_count = iaep_fetch_and_store_reviews();
+		if ( $new_count > 0 ) {
+			add_settings_error( 'iaep_messages', 'iaep_refreshed', sprintf( 'Cache cleared and %d new review(s) fetched from Google.', $new_count ), 'success' );
+		} else {
+			add_settings_error( 'iaep_messages', 'iaep_refreshed', 'Cache cleared. No new reviews found.', 'info' );
+		}
 	}
+} );
+
+/**
+ * Fetch reviews from Google Places API and store them persistently.
+ * Merges new reviews with existing ones to accumulate over time.
+ *
+ * @return int Number of new reviews added.
+ */
+function iaep_fetch_and_store_reviews() {
+	$opts = get_option( IAEP_OPTION );
+	$place_id = ! empty( $opts['place_id'] ) ? $opts['place_id'] : '';
+	$api_key = ! empty( $opts['api_key'] ) ? $opts['api_key'] : '';
+
+	if ( ! $place_id || ! $api_key ) {
+		return 0;
+	}
+
+	// Fetch reviews from Google Places API with reviews_sort parameter.
+	$reviews_sort = isset( $opts['reviews_sort'] ) ? $opts['reviews_sort'] : 'newest';
+	$sort_param = 'most_relevant'; // Default Google sort.
+	if ( 'newest' === $reviews_sort ) {
+		$sort_param = 'newest';
+	}
+
+	$fields = 'reviews';
+	$endpoint = add_query_arg(
+		array(
+			'place_id'     => $place_id,
+			'fields'       => $fields,
+			'reviews_sort' => $sort_param,
+			'key'          => $api_key,
+		),
+		'https://maps.googleapis.com/maps/api/place/details/json'
+	);
+
+	$response = wp_remote_get( $endpoint, array( 'timeout' => 15 ) );
+	if ( is_wp_error( $response ) ) {
+		return 0;
+	}
+
+	$body = wp_remote_retrieve_body( $response );
+	$data = json_decode( $body, true );
+
+	if ( empty( $data['status'] ) || 'OK' !== $data['status'] || empty( $data['result']['reviews'] ) ) {
+		return 0;
+	}
+
+	$fetched_reviews = $data['result']['reviews'];
+	$stored_reviews = get_option( IAEP_REVIEWS_OPTION, array() );
+	if ( ! is_array( $stored_reviews ) ) {
+		$stored_reviews = array();
+	}
+
+	// Create a unique key for each review based on author + time to avoid duplicates.
+	$existing_keys = array();
+	foreach ( $stored_reviews as $review ) {
+		$key = iaep_get_review_key( $review );
+		$existing_keys[ $key ] = true;
+	}
+
+	$new_count = 0;
+	foreach ( $fetched_reviews as $review ) {
+		$key = iaep_get_review_key( $review );
+		if ( ! isset( $existing_keys[ $key ] ) ) {
+			$stored_reviews[] = $review;
+			$existing_keys[ $key ] = true;
+			++$new_count;
+		}
+	}
+
+	if ( $new_count > 0 ) {
+		update_option( IAEP_REVIEWS_OPTION, $stored_reviews );
+		// Clear the JSON-LD cache so new reviews appear.
+		$transient_key = IAEP_TRANSIENT_PREFIX . md5( $place_id );
+		delete_transient( $transient_key );
+	}
+
+	return $new_count;
+}
+
+/**
+ * Generate a unique key for a review to detect duplicates.
+ *
+ * @param array $review Review data from Google.
+ * @return string Unique key.
+ */
+function iaep_get_review_key( $review ) {
+	$author = isset( $review['author_name'] ) ? $review['author_name'] : '';
+	$time = isset( $review['time'] ) ? $review['time'] : 0;
+	return md5( $author . '|' . $time );
+}
+
+/**
+ * Sort reviews based on preference.
+ *
+ * @param array  $reviews    Array of review data from Google.
+ * @param string $sort_order Sort order: 'newest', 'highest', or 'most_relevant'.
+ * @return array Sorted reviews.
+ */
+function iaep_sort_reviews( $reviews, $sort_order ) {
+	if ( empty( $reviews ) || ! is_array( $reviews ) ) {
+		return $reviews;
+	}
+
+	switch ( $sort_order ) {
+		case 'newest':
+			usort( $reviews, function( $a, $b ) {
+				$time_a = isset( $a['time'] ) ? (int) $a['time'] : 0;
+				$time_b = isset( $b['time'] ) ? (int) $b['time'] : 0;
+				return $time_b - $time_a; // Descending (newest first).
+			} );
+			break;
+		case 'highest':
+			usort( $reviews, function( $a, $b ) {
+				$rating_a = isset( $a['rating'] ) ? (float) $a['rating'] : 0;
+				$rating_b = isset( $b['rating'] ) ? (float) $b['rating'] : 0;
+				if ( $rating_b === $rating_a ) {
+					// Secondary sort by time (newest first) for same rating.
+					$time_a = isset( $a['time'] ) ? (int) $a['time'] : 0;
+					$time_b = isset( $b['time'] ) ? (int) $b['time'] : 0;
+					return $time_b - $time_a;
+				}
+				return $rating_b <=> $rating_a; // Descending (highest first).
+			} );
+			break;
+		case 'most_relevant':
+		default:
+			// Keep Google's default order (no sorting).
+			break;
+	}
+
+	return $reviews;
+}
+
+/* Cron handler for automatic review refresh */
+add_action( IAEP_CRON_HOOK, 'iaep_fetch_and_store_reviews' );
+
+/* Add custom cron schedule for weekly */
+add_filter( 'cron_schedules', function( $schedules ) {
+	if ( ! isset( $schedules['weekly'] ) ) {
+		$schedules['weekly'] = array(
+			'interval' => 604800,
+			'display'  => __( 'Once Weekly' ),
+		);
+	}
+	return $schedules;
 } );
 
 /* Helper: get offers (auto + manual) */
@@ -221,9 +441,9 @@ function iaep_build_jsonld() {
 	$offers = iaep_get_offers();
 	if ( $offers ) $schema['makesOffer'] = $offers;
 
-	// If we have Place ID & API key, fetch Place Details
+	// If we have Place ID & API key, fetch Place Details (excluding reviews which are stored separately).
 	if ( $place_id && $api_key ) {
-		$fields = implode( ',', array( 'name', 'formatted_phone_number', 'formatted_address', 'geometry', 'rating', 'user_ratings_total', 'reviews', 'url' ) );
+		$fields = implode( ',', array( 'name', 'formatted_phone_number', 'formatted_address', 'geometry', 'rating', 'user_ratings_total', 'url' ) );
 		$endpoint = add_query_arg( array( 'place_id' => $place_id, 'fields' => $fields, 'key' => $api_key ), 'https://maps.googleapis.com/maps/api/place/details/json' );
 		$response = wp_remote_get( $endpoint, array( 'timeout' => 10 ) );
 		if ( ! is_wp_error( $response ) ) {
@@ -245,23 +465,30 @@ function iaep_build_jsonld() {
 						'ratingCount' => isset( $r['user_ratings_total'] ) ? (int) $r['user_ratings_total'] : 0,
 					);
 				}
-				if ( ! empty( $r['reviews'] ) && is_array( $r['reviews'] ) ) {
-					$reviews = array();
-					foreach ( $r['reviews'] as $rev ) {
-						$review = array(
-							'@type' => 'Review',
-							'author' => array( '@type' => 'Person', 'name' => isset( $rev['author_name'] ) ? wp_strip_all_tags( $rev['author_name'] ) : '' ),
-							'reviewBody' => isset( $rev['text'] ) ? wp_strip_all_tags( $rev['text'] ) : '',
-							'publisher' => array( '@type' => 'Organization', 'name' => 'Google' ),
-						);
-						if ( isset( $rev['rating'] ) ) $review['reviewRating'] = array( '@type' => 'Rating', 'ratingValue' => (string) $rev['rating'], 'bestRating' => '5' );
-						if ( isset( $rev['time'] ) ) $review['datePublished'] = gmdate( 'c', intval( $rev['time'] ) );
-						$reviews[] = $review;
-					}
-					if ( $reviews ) $schema['review'] = $reviews;
-				}
 			}
 		}
+	}
+
+	// Add stored reviews to the schema.
+	$stored_reviews = get_option( IAEP_REVIEWS_OPTION, array() );
+	if ( ! empty( $stored_reviews ) && is_array( $stored_reviews ) ) {
+		// Sort reviews based on preference.
+		$reviews_sort = isset( $opts['reviews_sort'] ) ? $opts['reviews_sort'] : 'newest';
+		$stored_reviews = iaep_sort_reviews( $stored_reviews, $reviews_sort );
+
+		$reviews = array();
+		foreach ( $stored_reviews as $rev ) {
+			$review = array(
+				'@type' => 'Review',
+				'author' => array( '@type' => 'Person', 'name' => isset( $rev['author_name'] ) ? wp_strip_all_tags( $rev['author_name'] ) : '' ),
+				'reviewBody' => isset( $rev['text'] ) ? wp_strip_all_tags( $rev['text'] ) : '',
+				'publisher' => array( '@type' => 'Organization', 'name' => 'Google' ),
+			);
+			if ( isset( $rev['rating'] ) ) $review['reviewRating'] = array( '@type' => 'Rating', 'ratingValue' => (string) $rev['rating'], 'bestRating' => '5' );
+			if ( isset( $rev['time'] ) ) $review['datePublished'] = gmdate( 'c', intval( $rev['time'] ) );
+			$reviews[] = $review;
+		}
+		if ( $reviews ) $schema['review'] = $reviews;
 	}
 
 	$json = wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
