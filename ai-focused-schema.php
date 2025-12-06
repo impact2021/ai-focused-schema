@@ -47,7 +47,9 @@ add_action( 'admin_enqueue_scripts', function( $hook ) {
 		.aifs-form-table td input[type="text"],
 		.aifs-form-table td input[type="url"],
 		.aifs-form-table td input[type="email"],
-		.aifs-form-table td input[type="tel"] { width: 100%; max-width: 400px; }
+		.aifs-form-table td input[type="tel"],
+		.aifs-form-table td input[type="date"] { width: 100%; max-width: 400px; }
+		.aifs-form-table td select { width: 100%; max-width: 400px; }
 		.aifs-form-table td textarea { width: 100%; max-width: 600px; }
 		.aifs-json-upload { margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; }
 		.aifs-preview { background: #f5f5f5; padding: 15px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow: auto; }
@@ -91,6 +93,103 @@ add_action( 'admin_init', function() {
 		$sanitized = aifs_sanitize_schema_data( $parsed );
 		update_option( AIFS_OPTION, $sanitized );
 		add_settings_error( 'aifs_messages', 'aifs_json_success', 'Schema JSON uploaded successfully!', 'success' );
+		return;
+	}
+
+	// Handle review deletion.
+	if ( isset( $_POST['aifs_delete_review'] ) ) {
+		$nonce = isset( $_POST['aifs_reviews_nonce'] ) ? wp_unslash( $_POST['aifs_reviews_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		if ( ! wp_verify_nonce( $nonce, 'aifs_reviews_action' ) ) {
+			add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
+			return;
+		}
+
+		$schema = get_option( AIFS_OPTION, array() );
+		$review_index = isset( $_POST['review_index'] ) ? intval( $_POST['review_index'] ) : -1;
+
+		// Validate index is within bounds.
+		if ( $review_index >= 0 && isset( $schema['review'] ) && is_array( $schema['review'] ) && $review_index < count( $schema['review'] ) ) {
+			array_splice( $schema['review'], $review_index, 1 );
+			if ( empty( $schema['review'] ) ) {
+				unset( $schema['review'] );
+			}
+			// Recalculate aggregate rating.
+			aifs_update_aggregate_rating( $schema );
+			update_option( AIFS_OPTION, $schema );
+			add_settings_error( 'aifs_messages', 'aifs_review_deleted', 'Review deleted successfully!', 'success' );
+		}
+		return;
+	}
+
+	// Handle review addition/edit.
+	if ( isset( $_POST['aifs_save_review'] ) ) {
+		$nonce = isset( $_POST['aifs_reviews_nonce'] ) ? wp_unslash( $_POST['aifs_reviews_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		if ( ! wp_verify_nonce( $nonce, 'aifs_reviews_action' ) ) {
+			add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
+			return;
+		}
+
+		$schema = get_option( AIFS_OPTION, array() );
+
+		if ( isset( $_POST['aifs_review'] ) && is_array( $_POST['aifs_review'] ) ) {
+			$review_input = wp_unslash( $_POST['aifs_review'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+
+			$author_name = isset( $review_input['author'] ) ? sanitize_text_field( $review_input['author'] ) : '';
+			$rating = isset( $review_input['rating'] ) ? intval( $review_input['rating'] ) : 0;
+			$review_body = isset( $review_input['body'] ) ? sanitize_textarea_field( $review_input['body'] ) : '';
+			$date = isset( $review_input['date'] ) ? sanitize_text_field( $review_input['date'] ) : '';
+
+			// Validate date format if provided.
+			if ( ! empty( $date ) ) {
+				// Check basic format first.
+				if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+					add_settings_error( 'aifs_messages', 'aifs_review_error', 'Invalid date format. Please use YYYY-MM-DD format.', 'error' );
+					return;
+				}
+				// Validate actual date values.
+				$date_parts = explode( '-', $date );
+				if ( ! checkdate( (int) $date_parts[1], (int) $date_parts[2], (int) $date_parts[0] ) ) {
+					add_settings_error( 'aifs_messages', 'aifs_review_error', 'Invalid date. Please provide a valid date.', 'error' );
+					return;
+				}
+			}
+
+			if ( ! empty( $author_name ) && $rating >= 1 && $rating <= 5 ) {
+				$new_review = array(
+					'@type'        => 'Review',
+					'author'       => array(
+						'@type' => 'Person',
+						'name'  => $author_name,
+					),
+					'reviewRating' => array(
+						'@type'       => 'Rating',
+						'ratingValue' => $rating,
+					),
+				);
+
+				if ( ! empty( $review_body ) ) {
+					$new_review['reviewBody'] = $review_body;
+				}
+
+				if ( ! empty( $date ) ) {
+					$new_review['datePublished'] = $date;
+				}
+
+				if ( ! isset( $schema['review'] ) ) {
+					$schema['review'] = array();
+				}
+
+				$schema['review'][] = $new_review;
+
+				// Update aggregate rating based on all reviews.
+				aifs_update_aggregate_rating( $schema );
+
+				update_option( AIFS_OPTION, $schema );
+				add_settings_error( 'aifs_messages', 'aifs_review_success', 'Review added successfully!', 'success' );
+			} else {
+				add_settings_error( 'aifs_messages', 'aifs_review_error', 'Please provide author name and a valid rating (1-5).', 'error' );
+			}
+		}
 		return;
 	}
 
@@ -404,13 +503,102 @@ function aifs_admin_page() {
 				<tr>
 					<th><label for="aifs_additional">Additional JSON</label></th>
 					<td>
-						<textarea id="aifs_additional" name="aifs[additional_json]" rows="6" placeholder='{"aggregateRating": {"@type": "AggregateRating", "ratingValue": "4.5"}}'></textarea>
-						<p class="description">Add any additional schema fields as JSON. These will be merged into the schema.</p>
+						<textarea id="aifs_additional" name="aifs[additional_json]" rows="6" placeholder='{"menu": "https://example.com/menu.pdf"}'></textarea>
+						<p class="description">Add any additional schema fields as JSON. These will be merged into the schema. <strong>Note:</strong> Use the Reviews section below to manage reviews and ratings.</p>
 					</td>
 				</tr>
 			</table>
 
 			<?php submit_button( 'Save Changes', 'primary', 'aifs_save_fields' ); ?>
+		</form>
+
+		<!-- Reviews Management Section -->
+		<h2>Customer Reviews</h2>
+		<p>Add customer reviews below. The aggregate rating and rating count will be automatically calculated based on the reviews you add.</p>
+
+		<?php
+		$existing_reviews = isset( $schema['review'] ) && is_array( $schema['review'] ) ? $schema['review'] : array();
+		if ( ! empty( $existing_reviews ) ) :
+		?>
+			<h3>Existing Reviews</h3>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th>Author</th>
+						<th>Rating</th>
+						<th>Review</th>
+						<th>Date</th>
+						<th>Action</th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $existing_reviews as $index => $review ) : ?>
+						<tr>
+							<td><?php echo esc_html( isset( $review['author']['name'] ) ? $review['author']['name'] : 'N/A' ); ?></td>
+							<td><?php echo esc_html( isset( $review['reviewRating']['ratingValue'] ) ? $review['reviewRating']['ratingValue'] : 'N/A' ); ?> / 5</td>
+							<td><?php echo esc_html( isset( $review['reviewBody'] ) ? wp_trim_words( $review['reviewBody'], 10 ) : '(No review text)' ); ?></td>
+							<td><?php echo esc_html( isset( $review['datePublished'] ) ? $review['datePublished'] : 'N/A' ); ?></td>
+							<td>
+								<form method="post" style="display: inline;">
+									<?php wp_nonce_field( 'aifs_reviews_action', 'aifs_reviews_nonce' ); ?>
+									<input type="hidden" name="review_index" value="<?php echo esc_attr( $index ); ?>" />
+									<button type="submit" name="aifs_delete_review" class="button button-small" onclick="return confirm('Are you sure you want to delete this review?');">Delete</button>
+								</form>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+			<br>
+
+			<?php
+			// Display aggregate rating.
+			if ( isset( $schema['aggregateRating'] ) ) :
+				$agg_rating = $schema['aggregateRating'];
+			?>
+				<p><strong>Aggregate Rating:</strong> 
+					<?php echo esc_html( $agg_rating['ratingValue'] ); ?> out of 5 
+					(<?php echo esc_html( $agg_rating['ratingCount'] ); ?> review<?php echo ( (int) $agg_rating['ratingCount'] ) !== 1 ? 's' : ''; ?>)
+				</p>
+			<?php endif; ?>
+		<?php endif; ?>
+
+		<h3>Add New Review</h3>
+		<form method="post">
+			<?php wp_nonce_field( 'aifs_reviews_action', 'aifs_reviews_nonce' ); ?>
+			<table class="form-table aifs-form-table">
+				<tr>
+					<th><label for="aifs_review_author">Author Name *</label></th>
+					<td><input type="text" id="aifs_review_author" name="aifs_review[author]" required /></td>
+				</tr>
+				<tr>
+					<th><label for="aifs_review_rating">Rating (1-5) *</label></th>
+					<td>
+						<select id="aifs_review_rating" name="aifs_review[rating]" required>
+							<option value="">Select rating...</option>
+							<option value="5">5 - Excellent</option>
+							<option value="4">4 - Good</option>
+							<option value="3">3 - Average</option>
+							<option value="2">2 - Below Average</option>
+							<option value="1">1 - Poor</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="aifs_review_body">Review Text</label></th>
+					<td>
+						<textarea id="aifs_review_body" name="aifs_review[body]" rows="4" placeholder="Optional review text..."></textarea>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="aifs_review_date">Date Published</label></th>
+					<td>
+						<input type="date" id="aifs_review_date" name="aifs_review[date]" />
+						<p class="description">Optional. Format: YYYY-MM-DD (e.g., <?php echo esc_html( gmdate( 'Y-m-d' ) ); ?>)</p>
+					</td>
+				</tr>
+			</table>
+			<?php submit_button( 'Add Review', 'secondary', 'aifs_save_review' ); ?>
 		</form>
 
 		<!-- JSON Preview -->
@@ -461,6 +649,42 @@ add_shortcode( 'ai_entity_profile', function() {
 add_shortcode( 'impact_gbp_schema', function() {
 	return aifs_build_jsonld();
 } );
+
+/**
+ * Update aggregate rating based on reviews.
+ *
+ * @param array &$schema Schema data (passed by reference).
+ */
+function aifs_update_aggregate_rating( &$schema ) {
+	if ( ! isset( $schema['review'] ) || ! is_array( $schema['review'] ) || empty( $schema['review'] ) ) {
+		// No reviews, remove aggregate rating.
+		if ( isset( $schema['aggregateRating'] ) ) {
+			unset( $schema['aggregateRating'] );
+		}
+		return;
+	}
+
+	$ratings = array();
+	foreach ( $schema['review'] as $review ) {
+		if ( isset( $review['reviewRating']['ratingValue'] ) ) {
+			$ratings[] = floatval( $review['reviewRating']['ratingValue'] );
+		}
+	}
+
+	if ( ! empty( $ratings ) ) {
+		$rating_count = count( $ratings );
+		$rating_sum = array_sum( $ratings );
+		$rating_value = $rating_sum / $rating_count;
+
+		$schema['aggregateRating'] = array(
+			'@type'       => 'AggregateRating',
+			'ratingValue' => round( $rating_value, 1 ),
+			'ratingCount' => $rating_count,
+		);
+	} elseif ( isset( $schema['aggregateRating'] ) ) {
+		unset( $schema['aggregateRating'] );
+	}
+}
 
 /**
  * Recursively sanitize schema data to prevent XSS.
