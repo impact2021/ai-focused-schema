@@ -357,7 +357,7 @@ add_action( 'admin_init', function() {
 			if ( isset( $input['contactPoint'] ) && is_array( $input['contactPoint'] ) ) {
 				$contact_input = $input['contactPoint'];
 				$contact_point = array( '@type' => 'ContactPoint' );
-				
+
 				if ( ! empty( $contact_input['telephone'] ) ) {
 					$contact_point['telephone'] = sanitize_text_field( $contact_input['telephone'] );
 				}
@@ -367,7 +367,7 @@ add_action( 'admin_init', function() {
 				if ( ! empty( $contact_input['areaServed'] ) ) {
 					$contact_point['areaServed'] = sanitize_text_field( $contact_input['areaServed'] );
 				}
-				
+
 				if ( count( $contact_point ) > 1 ) {
 					$schema['contactPoint'] = $contact_point;
 				} elseif ( isset( $schema['contactPoint'] ) ) {
