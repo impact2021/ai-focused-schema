@@ -77,7 +77,7 @@ add_action( 'admin_init', function() {
 		// Use anchored pattern to only match wrapper tags at beginning/end.
 		$json_input = trim( $json_input );
 		if ( preg_match( '/^\s*<script[^>]*>(.*)<\/script>\s*$/is', $json_input, $matches ) ) {
-			$json_input = $matches[1];
+			$json_input = trim( $matches[1] );
 		}
 		
 		$parsed = json_decode( $json_input, true );
