@@ -107,7 +107,8 @@ add_action( 'admin_init', function() {
 		$schema = get_option( AIFS_OPTION, array() );
 		$review_index = isset( $_POST['review_index'] ) ? intval( $_POST['review_index'] ) : -1;
 
-		if ( $review_index >= 0 && isset( $schema['review'] ) && is_array( $schema['review'] ) ) {
+		// Validate index is within bounds.
+		if ( $review_index >= 0 && isset( $schema['review'] ) && is_array( $schema['review'] ) && $review_index < count( $schema['review'] ) ) {
 			array_splice( $schema['review'], $review_index, 1 );
 			if ( empty( $schema['review'] ) ) {
 				unset( $schema['review'] );
@@ -133,10 +134,22 @@ add_action( 'admin_init', function() {
 		if ( isset( $_POST['aifs_review'] ) && is_array( $_POST['aifs_review'] ) ) {
 			$review_input = wp_unslash( $_POST['aifs_review'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
+			// Validate array structure to prevent injection attacks.
+			if ( ! is_array( $review_input ) ) {
+				add_settings_error( 'aifs_messages', 'aifs_review_error', 'Invalid review data.', 'error' );
+				return;
+			}
+
 			$author_name = isset( $review_input['author'] ) ? sanitize_text_field( $review_input['author'] ) : '';
 			$rating = isset( $review_input['rating'] ) ? intval( $review_input['rating'] ) : 0;
 			$review_body = isset( $review_input['body'] ) ? sanitize_textarea_field( $review_input['body'] ) : '';
 			$date = isset( $review_input['date'] ) ? sanitize_text_field( $review_input['date'] ) : '';
+
+			// Validate date format if provided.
+			if ( ! empty( $date ) && ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+				add_settings_error( 'aifs_messages', 'aifs_review_error', 'Invalid date format. Please use YYYY-MM-DD format.', 'error' );
+				return;
+			}
 
 			if ( ! empty( $author_name ) && $rating >= 1 && $rating <= 5 ) {
 				$new_review = array(
