@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'AIFS_OPTION', 'aifs_schema_data' );
+define( 'AIFS_GMB_OPTION', 'aifs_gmb_settings' );
 
 /**
  * Activation: set up default option.
@@ -19,6 +20,14 @@ define( 'AIFS_OPTION', 'aifs_schema_data' );
 register_activation_hook( __FILE__, function() {
 	if ( ! get_option( AIFS_OPTION ) ) {
 		add_option( AIFS_OPTION, array() );
+	}
+	if ( ! get_option( AIFS_GMB_OPTION ) ) {
+		add_option( AIFS_GMB_OPTION, array(
+			'api_key' => '',
+			'place_id' => '',
+			'last_sync' => '',
+			'auto_sync' => false,
+		) );
 	}
 } );
 
@@ -54,6 +63,7 @@ add_action( 'admin_enqueue_scripts', function( $hook ) {
 		.aifs-json-upload { margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; }
 		.aifs-preview { background: #f5f5f5; padding: 15px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow: auto; }
 		.aifs-shortcode-info { background: #e7f3ff; padding: 10px 15px; border-left: 4px solid #0073aa; margin: 15px 0; }
+		.aifs-gmb-section { margin: 20px 0; padding: 15px; background: #f0f7ff; border: 1px solid #b8d4f1; border-radius: 4px; }
 	' );
 } );
 
@@ -193,6 +203,46 @@ add_action( 'admin_init', function() {
 		return;
 	}
 
+	// Handle Google My Business settings save.
+	if ( isset( $_POST['aifs_save_gmb_settings'] ) ) {
+		$nonce = isset( $_POST['aifs_gmb_nonce'] ) ? wp_unslash( $_POST['aifs_gmb_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		if ( ! wp_verify_nonce( $nonce, 'aifs_gmb_action' ) ) {
+			add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
+			return;
+		}
+
+		$gmb_settings = get_option( AIFS_GMB_OPTION, array() );
+		
+		if ( isset( $_POST['aifs_gmb'] ) && is_array( $_POST['aifs_gmb'] ) ) {
+			$gmb_input = wp_unslash( $_POST['aifs_gmb'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			
+			$gmb_settings['api_key'] = isset( $gmb_input['api_key'] ) ? sanitize_text_field( $gmb_input['api_key'] ) : '';
+			$gmb_settings['place_id'] = isset( $gmb_input['place_id'] ) ? sanitize_text_field( $gmb_input['place_id'] ) : '';
+		}
+		
+		update_option( AIFS_GMB_OPTION, $gmb_settings );
+		add_settings_error( 'aifs_messages', 'aifs_gmb_success', 'Google My Business settings saved successfully!', 'success' );
+		return;
+	}
+
+	// Handle Google My Business reviews fetch.
+	if ( isset( $_POST['aifs_fetch_gmb_reviews'] ) ) {
+		$nonce = isset( $_POST['aifs_gmb_nonce'] ) ? wp_unslash( $_POST['aifs_gmb_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		if ( ! wp_verify_nonce( $nonce, 'aifs_gmb_action' ) ) {
+			add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
+			return;
+		}
+
+		$result = aifs_fetch_gmb_reviews();
+		
+		if ( is_wp_error( $result ) ) {
+			add_settings_error( 'aifs_messages', 'aifs_gmb_error', 'Error fetching reviews: ' . $result->get_error_message(), 'error' );
+		} else {
+			add_settings_error( 'aifs_messages', 'aifs_gmb_success', 'Successfully imported ' . $result . ' review(s) from Google My Business!', 'success' );
+		}
+		return;
+	}
+
 	// Handle field edits.
 	if ( isset( $_POST['aifs_save_fields'] ) ) {
 		$nonce = isset( $_POST['aifs_fields_nonce'] ) ? wp_unslash( $_POST['aifs_fields_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
@@ -314,6 +364,118 @@ add_action( 'admin_init', function() {
 		add_settings_error( 'aifs_messages', 'aifs_fields_success', 'Schema fields updated successfully!', 'success' );
 	}
 } );
+
+/**
+ * Fetch reviews from Google My Business via Google Places API.
+ *
+ * @return int|WP_Error Number of reviews imported on success, WP_Error on failure.
+ */
+function aifs_fetch_gmb_reviews() {
+	$gmb_settings = get_option( AIFS_GMB_OPTION, array() );
+	
+	$api_key = isset( $gmb_settings['api_key'] ) ? $gmb_settings['api_key'] : '';
+	$place_id = isset( $gmb_settings['place_id'] ) ? $gmb_settings['place_id'] : '';
+	
+	if ( empty( $api_key ) || empty( $place_id ) ) {
+		return new WP_Error( 'missing_credentials', 'API Key and Place ID are required.' );
+	}
+	
+	// Build the Google Places API request URL.
+	$url = add_query_arg(
+		array(
+			'place_id' => $place_id,
+			'fields' => 'reviews',
+			'key' => $api_key,
+		),
+		'https://maps.googleapis.com/maps/api/place/details/json'
+	);
+	
+	// Make the API request.
+	$response = wp_remote_get( $url, array( 'timeout' => 15 ) );
+	
+	if ( is_wp_error( $response ) ) {
+		return new WP_Error( 'api_error', 'Failed to connect to Google Places API: ' . $response->get_error_message() );
+	}
+	
+	$body = wp_remote_retrieve_body( $response );
+	$data = json_decode( $body, true );
+	
+	if ( ! isset( $data['status'] ) || 'OK' !== $data['status'] ) {
+		$error_msg = isset( $data['error_message'] ) ? $data['error_message'] : ( isset( $data['status'] ) ? $data['status'] : 'Unknown error' );
+		return new WP_Error( 'api_error', 'Google API error: ' . $error_msg );
+	}
+	
+	if ( ! isset( $data['result']['reviews'] ) || ! is_array( $data['result']['reviews'] ) ) {
+		return new WP_Error( 'no_reviews', 'No reviews found for this location.' );
+	}
+	
+	$schema = get_option( AIFS_OPTION, array() );
+	$gmb_reviews = $data['result']['reviews'];
+	$imported_count = 0;
+	
+	// Get existing review author names to avoid duplicates.
+	$existing_authors = array();
+	if ( isset( $schema['review'] ) && is_array( $schema['review'] ) ) {
+		foreach ( $schema['review'] as $review ) {
+			if ( isset( $review['author']['name'] ) ) {
+				$existing_authors[] = strtolower( trim( $review['author']['name'] ) );
+			}
+		}
+	} else {
+		$schema['review'] = array();
+	}
+	
+	// Transform and import GMB reviews.
+	foreach ( $gmb_reviews as $gmb_review ) {
+		$author_name = isset( $gmb_review['author_name'] ) ? sanitize_text_field( $gmb_review['author_name'] ) : '';
+		$rating = isset( $gmb_review['rating'] ) ? intval( $gmb_review['rating'] ) : 0;
+		$text = isset( $gmb_review['text'] ) ? sanitize_textarea_field( $gmb_review['text'] ) : '';
+		$time = isset( $gmb_review['time'] ) ? intval( $gmb_review['time'] ) : 0;
+		
+		// Skip if author already exists (avoid duplicates).
+		if ( in_array( strtolower( trim( $author_name ) ), $existing_authors, true ) ) {
+			continue;
+		}
+		
+		if ( ! empty( $author_name ) && $rating >= 1 && $rating <= 5 ) {
+			$new_review = array(
+				'@type'        => 'Review',
+				'author'       => array(
+					'@type' => 'Person',
+					'name'  => $author_name,
+				),
+				'reviewRating' => array(
+					'@type'       => 'Rating',
+					'ratingValue' => $rating,
+				),
+			);
+			
+			if ( ! empty( $text ) ) {
+				$new_review['reviewBody'] = $text;
+			}
+			
+			if ( $time > 0 ) {
+				$new_review['datePublished'] = gmdate( 'Y-m-d', $time );
+			}
+			
+			$schema['review'][] = $new_review;
+			$existing_authors[] = strtolower( trim( $author_name ) );
+			$imported_count++;
+		}
+	}
+	
+	if ( $imported_count > 0 ) {
+		// Update aggregate rating.
+		aifs_update_aggregate_rating( $schema );
+		update_option( AIFS_OPTION, $schema );
+		
+		// Update last sync time.
+		$gmb_settings['last_sync'] = current_time( 'mysql' );
+		update_option( AIFS_GMB_OPTION, $gmb_settings );
+	}
+	
+	return $imported_count;
+}
 
 /**
  * Admin page HTML.
@@ -512,9 +674,52 @@ function aifs_admin_page() {
 			<?php submit_button( 'Save Changes', 'primary', 'aifs_save_fields' ); ?>
 		</form>
 
+		<!-- Google My Business Settings Section -->
+		<h2>Google My Business Integration</h2>
+		<p>Connect your Google My Business account to automatically import reviews. You'll need a Google Places API key and your Place ID.</p>
+		
+		<?php
+		$gmb_settings = get_option( AIFS_GMB_OPTION, array() );
+		$gmb_api_key = isset( $gmb_settings['api_key'] ) ? $gmb_settings['api_key'] : '';
+		$gmb_place_id = isset( $gmb_settings['place_id'] ) ? $gmb_settings['place_id'] : '';
+		$gmb_last_sync = isset( $gmb_settings['last_sync'] ) ? $gmb_settings['last_sync'] : '';
+		?>
+		
+		<form method="post">
+			<?php wp_nonce_field( 'aifs_gmb_action', 'aifs_gmb_nonce' ); ?>
+			<table class="form-table aifs-form-table">
+				<tr>
+					<th><label for="aifs_gmb_api_key">Google Places API Key *</label></th>
+					<td>
+						<input type="text" id="aifs_gmb_api_key" name="aifs_gmb[api_key]" value="<?php echo esc_attr( $gmb_api_key ); ?>" />
+						<p class="description">Get your API key from the <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a>. Enable the Places API.</p>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="aifs_gmb_place_id">Place ID *</label></th>
+					<td>
+						<input type="text" id="aifs_gmb_place_id" name="aifs_gmb[place_id]" value="<?php echo esc_attr( $gmb_place_id ); ?>" />
+						<p class="description">Find your Place ID using the <a href="https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder" target="_blank">Place ID Finder</a>.</p>
+					</td>
+				</tr>
+				<?php if ( ! empty( $gmb_last_sync ) ) : ?>
+				<tr>
+					<th>Last Sync</th>
+					<td><?php echo esc_html( $gmb_last_sync ); ?></td>
+				</tr>
+				<?php endif; ?>
+			</table>
+			
+			<?php submit_button( 'Save GMB Settings', 'secondary', 'aifs_save_gmb_settings', false ); ?>
+			&nbsp;
+			<?php if ( ! empty( $gmb_api_key ) && ! empty( $gmb_place_id ) ) : ?>
+				<?php submit_button( 'Fetch Reviews from Google', 'primary', 'aifs_fetch_gmb_reviews', false ); ?>
+			<?php endif; ?>
+		</form>
+
 		<!-- Reviews Management Section -->
 		<h2>Customer Reviews</h2>
-		<p>Add customer reviews below. The aggregate rating and rating count will be automatically calculated based on the reviews you add.</p>
+		<p>Reviews can be added manually below or imported automatically from Google My Business using the settings above. The aggregate rating and rating count will be automatically calculated.</p>
 
 		<?php
 		$existing_reviews = isset( $schema['review'] ) && is_array( $schema['review'] ) ? $schema['review'] : array();
