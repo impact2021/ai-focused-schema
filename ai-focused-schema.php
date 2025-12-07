@@ -1163,14 +1163,14 @@ function aifs_merge_schemas( $global_schema, $page_schema ) {
 	}
 	
 	// Check if both schemas have @type and they are different
-	$global_type = isset( $global_schema['@type'] ) ? $global_schema['@type'] : '';
-	$page_type = isset( $page_schema['@type'] ) ? $page_schema['@type'] : '';
+	$global_type = $global_schema['@type'] ?? '';
+	$page_type = $page_schema['@type'] ?? '';
 	
 	// If both have @type values and they're different, use @graph to combine them
 	if ( ! empty( $global_type ) && ! empty( $page_type ) && $global_type !== $page_type ) {
 		// Create a graph structure with both schemas
-		$context = isset( $page_schema['@context'] ) ? $page_schema['@context'] : 
-		           ( isset( $global_schema['@context'] ) ? $global_schema['@context'] : 'https://schema.org' );
+		// Use page context if available, fallback to global, then default
+		$context = $page_schema['@context'] ?? $global_schema['@context'] ?? 'https://schema.org';
 		
 		// Remove @context from individual schemas as it should only be at root level
 		$global_copy = $global_schema;
