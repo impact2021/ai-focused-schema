@@ -1309,9 +1309,20 @@ function aifs_update_aggregate_rating( &$schema ) {
 function aifs_sanitize_schema_data( $data ) {
 	if ( is_array( $data ) ) {
 		$sanitized = array();
+		
+		// Check if this is a Review object - reviews should not have aggregateRating
+		$is_review = isset( $data['@type'] ) && 'Review' === $data['@type'];
+		
 		foreach ( $data as $key => $value ) {
 			// Sanitize keys to prevent injection.
 			$clean_key = sanitize_text_field( $key );
+			
+			// Remove aggregateRating from Review objects to prevent "Review has multiple aggregate ratings" error
+			// aggregateRating should only exist on the parent entity (LocalBusiness, Product, etc.), not on individual reviews
+			if ( $is_review && 'aggregateRating' === $clean_key ) {
+				continue; // Skip this property for Review objects
+			}
+			
 			$sanitized[ $clean_key ] = aifs_sanitize_schema_data( $value );
 		}
 		return $sanitized;
