@@ -851,7 +851,7 @@ function aifs_admin_page() {
 
 		<!-- Reviews Management Section -->
 		<h2>Customer Reviews</h2>
-		<p>Add customer reviews manually to your schema. The aggregate rating and rating count will be automatically calculated.</p>
+		<p>Add customer reviews manually to your schema. When you have <strong>2 or more reviews</strong>, the aggregate rating and rating count will be automatically calculated and added to your schema. Single reviews will be displayed without an aggregate rating, as per Google's guidelines.</p>
 
 		<?php
 		$existing_reviews = isset( $schema['review'] ) && is_array( $schema['review'] ) ? $schema['review'] : array();
@@ -1291,7 +1291,11 @@ function aifs_update_aggregate_rating( &$schema ) {
 		}
 	}
 
-	if ( ! empty( $ratings ) ) {
+	// Only add aggregateRating if we have 2 or more reviews.
+	// According to Google's guidelines, a single review should not have an aggregateRating
+	// because "aggregate" implies multiple reviews. This prevents the
+	// "Review has multiple aggregate ratings" error in Google Rich Results Test.
+	if ( count( $ratings ) >= 2 ) {
 		$rating_count = count( $ratings );
 		$rating_sum = array_sum( $ratings );
 		$rating_value = $rating_sum / $rating_count;
@@ -1302,6 +1306,7 @@ function aifs_update_aggregate_rating( &$schema ) {
 			'ratingCount' => $rating_count,
 		);
 	} elseif ( isset( $schema['aggregateRating'] ) ) {
+		// Remove aggregateRating if we have 0 or 1 reviews.
 		unset( $schema['aggregateRating'] );
 	}
 }
