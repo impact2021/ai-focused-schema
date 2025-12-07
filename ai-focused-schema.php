@@ -187,13 +187,16 @@ add_action( 'save_post', function( $post_id ) {
 	
 	// Save schema JSON.
 	if ( isset( $_POST['aifs_page_schema_json'] ) ) {
+		// Don't use sanitize_textarea_field as it will break JSON.
+		// Instead, wp_unslash and then parse/sanitize the decoded JSON.
 		$json_input = wp_unslash( $_POST['aifs_page_schema_json'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$json_input = trim( $json_input );
 		
 		// If enabled and JSON provided, validate it.
 		if ( '1' === $enabled && ! empty( $json_input ) ) {
 			// Strip <script> tags if user pasted complete HTML snippet.
-			if ( preg_match( '/^\s*<script[^>]*>(.*)<\/script>\s*$/is', $json_input, $matches ) ) {
+			// Only match JSON-LD script tags for security.
+			if ( preg_match( '/^\s*<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*)<\/script>\s*$/is', $json_input, $matches ) ) {
 				$json_input = trim( $matches[1] );
 			}
 			
@@ -224,7 +227,12 @@ add_action( 'save_post', function( $post_id ) {
  */
 add_action( 'admin_notices', function() {
 	global $post;
-	if ( $post && ( $error = get_transient( 'aifs_page_schema_error_' . $post->ID ) ) ) {
+	if ( ! $post ) {
+		return;
+	}
+	
+	$error = get_transient( 'aifs_page_schema_error_' . $post->ID );
+	if ( $error ) {
 		echo '<div class="notice notice-error is-dismissible">';
 		echo '<p><strong>AI Focused Schema Error:</strong> ' . esc_html( $error ) . '</p>';
 		echo '</div>';
