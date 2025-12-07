@@ -1147,6 +1147,7 @@ function aifs_build_jsonld( $post_id = null ) {
 
 /**
  * Merge two schema arrays, with page-specific values overriding global values.
+ * When schemas have different @type values, they are combined using @graph.
  *
  * @param array $global_schema Global schema data.
  * @param array $page_schema Page-specific schema data.
@@ -1161,6 +1162,32 @@ function aifs_merge_schemas( $global_schema, $page_schema ) {
 		return $global_schema;
 	}
 	
+	// Check if both schemas have @type and they are different
+	$global_type = isset( $global_schema['@type'] ) ? $global_schema['@type'] : '';
+	$page_type = isset( $page_schema['@type'] ) ? $page_schema['@type'] : '';
+	
+	// If both have @type values and they're different, use @graph to combine them
+	if ( ! empty( $global_type ) && ! empty( $page_type ) && $global_type !== $page_type ) {
+		// Create a graph structure with both schemas
+		$context = isset( $page_schema['@context'] ) ? $page_schema['@context'] : 
+		           ( isset( $global_schema['@context'] ) ? $global_schema['@context'] : 'https://schema.org' );
+		
+		// Remove @context from individual schemas as it should only be at root level
+		$global_copy = $global_schema;
+		$page_copy = $page_schema;
+		unset( $global_copy['@context'] );
+		unset( $page_copy['@context'] );
+		
+		return array(
+			'@context' => $context,
+			'@graph'   => array(
+				$global_copy,
+				$page_copy,
+			),
+		);
+	}
+	
+	// If @type is the same or one is missing, perform standard merge
 	// Start with global schema
 	$merged = $global_schema;
 	
