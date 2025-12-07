@@ -997,7 +997,8 @@ function aifs_docs_page() {
 	$readme_path = plugin_dir_path( __FILE__ ) . 'README.md';
 	$readme_content = '';
 	
-	if ( file_exists( $readme_path ) ) {
+	if ( file_exists( $readme_path ) && filesize( $readme_path ) < 500000 ) {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		$readme_content = file_get_contents( $readme_path );
 	}
 	
@@ -1045,16 +1046,20 @@ function aifs_simple_markdown_to_html( $markdown ) {
 	// Convert links
 	$html = preg_replace( '/\[([^\]]+)\]\(([^\)]+)\)/', '<a href="$2" target="_blank">$1</a>', $html );
 	
-	// Convert lists
-	$html = preg_replace( '/^- (.+)$/m', '<li>$1</li>', $html );
-	$html = preg_replace( '/(<li>.*<\/li>)/s', '<ul>$1</ul>', $html );
+	// Convert lists (mark differently first)
+	$html = preg_replace( '/^- (.+)$/m', '<!--UL--><li>$1</li>', $html );
+	$html = preg_replace( '/^\d+\. (.+)$/m', '<!--OL--><li>$1</li>', $html );
 	
-	// Convert numbered lists
-	$html = preg_replace( '/^\d+\. (.+)$/m', '<li>$1</li>', $html );
+	// Wrap consecutive list items
+	$html = preg_replace( '/((?:<!--UL--><li>.*<\/li>\n?)+)/s', '<ul>$1</ul>', $html );
+	$html = preg_replace( '/((?:<!--OL--><li>.*<\/li>\n?)+)/s', '<ol>$1</ol>', $html );
+	
+	// Remove markers
+	$html = str_replace( '<!--UL-->', '', $html );
+	$html = str_replace( '<!--OL-->', '', $html );
 	
 	// Convert paragraphs (lines separated by blank lines)
 	$lines = explode( "\n", $html );
-	$in_list = false;
 	$result = array();
 	$paragraph = '';
 	
