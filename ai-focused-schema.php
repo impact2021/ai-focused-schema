@@ -354,6 +354,8 @@ add_action( 'admin_init', function() {
 					'reviewRating' => array(
 						'@type'       => 'Rating',
 						'ratingValue' => $rating,
+						'bestRating'  => 5,
+						'worstRating' => 1,
 					),
 				);
 
@@ -1304,6 +1306,8 @@ function aifs_update_aggregate_rating( &$schema ) {
 			'@type'       => 'AggregateRating',
 			'ratingValue' => round( $rating_value, 1 ),
 			'ratingCount' => $rating_count,
+			'bestRating'  => 5,
+			'worstRating' => 1,
 		);
 	} elseif ( isset( $schema['aggregateRating'] ) ) {
 		// Remove aggregateRating if we have 0 or 1 reviews.
