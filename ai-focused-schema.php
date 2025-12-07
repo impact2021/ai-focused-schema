@@ -14,6 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'AIFS_OPTION', 'aifs_schema_data' );
 define( 'AIFS_GMB_OPTION', 'aifs_gmb_settings' );
 define( 'AIFS_SETTINGS_OPTION', 'aifs_plugin_settings' );
+define( 'AIFS_PAGE_SCHEMA_META', '_aifs_page_schema' );
+define( 'AIFS_PAGE_SCHEMA_ENABLED_META', '_aifs_page_schema_enabled' );
 
 /**
  * Activation: set up default option.
@@ -52,26 +54,190 @@ add_action( 'admin_menu', function() {
 } );
 
 /**
- * Enqueue admin styles for the plugin page.
+ * Add metabox for page-specific schema on posts and pages.
+ */
+add_action( 'add_meta_boxes', function() {
+	$post_types = array( 'post', 'page' );
+	foreach ( $post_types as $post_type ) {
+		add_meta_box(
+			'aifs_page_schema',
+			'AI Focused Schema - Page Specific',
+			'aifs_page_schema_metabox',
+			$post_type,
+			'normal',
+			'default'
+		);
+	}
+} );
+
+/**
+ * Display admin notice about SEOpress compatibility.
+ */
+add_action( 'admin_notices', function() {
+	$screen = get_current_screen();
+	if ( $screen && 'toplevel_page_ai-focused-schema' === $screen->id ) {
+		$settings = get_option( AIFS_SETTINGS_OPTION, array() );
+		$auto_output = isset( $settings['auto_output'] ) ? $settings['auto_output'] : 'on';
+		$schema = get_option( AIFS_OPTION, array() );
+		
+		if ( $auto_output === 'on' && ! empty( $schema ) ) {
+			echo '<div class="notice notice-info is-dismissible">';
+			echo '<p><strong>Schema Output Active:</strong> Your schema is being automatically outputted to the page &lt;head&gt; and is detectable by Google and search engines. ';
+			echo 'Note: SEOpress will only show schemas it manages directly in its dashboard. To verify your schema is live, use ';
+			echo '<a href="https://search.google.com/test/rich-results" target="_blank">Google Rich Results Test</a>.</p>';
+			echo '</div>';
+		}
+	}
+} );
+
+/**
+ * Enqueue admin styles for the plugin page and metabox.
  */
 add_action( 'admin_enqueue_scripts', function( $hook ) {
-	if ( 'toplevel_page_ai-focused-schema' !== $hook ) {
+	// Styles for main settings page.
+	if ( 'toplevel_page_ai-focused-schema' === $hook ) {
+		wp_add_inline_style( 'wp-admin', '
+			.aifs-form-table th { width: 200px; }
+			.aifs-form-table td input[type="text"],
+			.aifs-form-table td input[type="url"],
+			.aifs-form-table td input[type="email"],
+			.aifs-form-table td input[type="tel"],
+			.aifs-form-table td input[type="date"] { width: 100%; max-width: 400px; }
+			.aifs-form-table td select { width: 100%; max-width: 400px; }
+			.aifs-form-table td textarea { width: 100%; max-width: 600px; }
+			.aifs-json-upload { margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; }
+			.aifs-preview { background: #f5f5f5; padding: 15px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow: auto; }
+			.aifs-shortcode-info { background: #e7f3ff; padding: 10px 15px; border-left: 4px solid #0073aa; margin: 15px 0; }
+			.aifs-gmb-section { margin: 20px 0; padding: 15px; background: #f0f7ff; border: 1px solid #b8d4f1; border-radius: 4px; }
+		' );
+	}
+	
+	// Styles for post/page metabox.
+	$screen = get_current_screen();
+	if ( $screen && in_array( $screen->post_type, array( 'post', 'page' ), true ) ) {
+		wp_add_inline_style( 'wp-admin', '
+			.aifs-metabox-info { background: #f0f7ff; padding: 10px; border-left: 4px solid #0073aa; margin-bottom: 15px; }
+			.aifs-metabox-textarea { width: 100%; min-height: 200px; font-family: monospace; font-size: 12px; }
+		' );
+	}
+} );
+
+/**
+ * Metabox callback for page-specific schema.
+ */
+function aifs_page_schema_metabox( $post ) {
+	wp_nonce_field( 'aifs_page_schema_save', 'aifs_page_schema_nonce' );
+	
+	$enabled = get_post_meta( $post->ID, AIFS_PAGE_SCHEMA_ENABLED_META, true );
+	$page_schema_json = get_post_meta( $post->ID, AIFS_PAGE_SCHEMA_META, true );
+	
+	?>
+	<div class="aifs-metabox-info">
+		<strong>Page-Specific Schema:</strong> Override the global schema for this specific page/post. 
+		When enabled, this schema will be used instead of the global schema configured in AI Schema settings.
+	</div>
+	
+	<p>
+		<label>
+			<input type="checkbox" name="aifs_page_schema_enabled" value="1" <?php checked( $enabled, '1' ); ?> />
+			Enable page-specific schema for this page/post
+		</label>
+	</p>
+	
+	<p>
+		<label for="aifs_page_schema_json"><strong>Schema JSON-LD:</strong></label><br>
+		<textarea 
+			id="aifs_page_schema_json" 
+			name="aifs_page_schema_json" 
+			class="aifs-metabox-textarea"
+			placeholder='{"@context": "https://schema.org", "@type": "Article", "headline": "Your Title"}'
+		><?php echo esc_textarea( $page_schema_json ); ?></textarea>
+	</p>
+	
+	<p class="description">
+		Enter your JSON-LD schema. You can paste the complete JSON object (without &lt;script&gt; tags). 
+		This will be validated when you save.
+	</p>
+	<?php
+}
+
+/**
+ * Save page-specific schema metadata.
+ */
+add_action( 'save_post', function( $post_id ) {
+	// Check nonce.
+	if ( ! isset( $_POST['aifs_page_schema_nonce'] ) || 
+	     ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['aifs_page_schema_nonce'] ) ), 'aifs_page_schema_save' ) ) {
 		return;
 	}
-	wp_add_inline_style( 'wp-admin', '
-		.aifs-form-table th { width: 200px; }
-		.aifs-form-table td input[type="text"],
-		.aifs-form-table td input[type="url"],
-		.aifs-form-table td input[type="email"],
-		.aifs-form-table td input[type="tel"],
-		.aifs-form-table td input[type="date"] { width: 100%; max-width: 400px; }
-		.aifs-form-table td select { width: 100%; max-width: 400px; }
-		.aifs-form-table td textarea { width: 100%; max-width: 600px; }
-		.aifs-json-upload { margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; }
-		.aifs-preview { background: #f5f5f5; padding: 15px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow: auto; }
-		.aifs-shortcode-info { background: #e7f3ff; padding: 10px 15px; border-left: 4px solid #0073aa; margin: 15px 0; }
-		.aifs-gmb-section { margin: 20px 0; padding: 15px; background: #f0f7ff; border: 1px solid #b8d4f1; border-radius: 4px; }
-	' );
+	
+	// Check autosave.
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return;
+	}
+	
+	// Check permissions.
+	if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		return;
+	}
+	
+	// Save enabled status.
+	$enabled = isset( $_POST['aifs_page_schema_enabled'] ) ? '1' : '0';
+	update_post_meta( $post_id, AIFS_PAGE_SCHEMA_ENABLED_META, $enabled );
+	
+	// Save schema JSON.
+	if ( isset( $_POST['aifs_page_schema_json'] ) ) {
+		// Don't use sanitize_textarea_field as it will break JSON.
+		// Instead, wp_unslash and then parse/sanitize the decoded JSON.
+		$json_input = wp_unslash( $_POST['aifs_page_schema_json'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$json_input = trim( $json_input );
+		
+		// If enabled and JSON provided, validate it.
+		if ( '1' === $enabled && ! empty( $json_input ) ) {
+			// Strip <script> tags if user pasted complete HTML snippet.
+			// Only match JSON-LD script tags for security.
+			if ( preg_match( '/^\s*<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*)<\/script>\s*$/is', $json_input, $matches ) ) {
+				$json_input = trim( $matches[1] );
+			}
+			
+			$parsed = json_decode( $json_input, true );
+			
+			if ( json_last_error() !== JSON_ERROR_NONE ) {
+				// Invalid JSON - save error state.
+				update_post_meta( $post_id, AIFS_PAGE_SCHEMA_META, '' );
+				// Add admin notice (will be shown on next page load).
+				set_transient( 'aifs_page_schema_error_' . $post_id, 'Invalid JSON: ' . json_last_error_msg(), 45 );
+			} else {
+				// Valid JSON - sanitize and save.
+				$sanitized = aifs_sanitize_schema_data( $parsed );
+				$sanitized_json = wp_json_encode( $sanitized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+				update_post_meta( $post_id, AIFS_PAGE_SCHEMA_META, $sanitized_json );
+				delete_transient( 'aifs_page_schema_error_' . $post_id );
+			}
+		} else {
+			// Not enabled or empty - just save as is.
+			update_post_meta( $post_id, AIFS_PAGE_SCHEMA_META, $json_input );
+			delete_transient( 'aifs_page_schema_error_' . $post_id );
+		}
+	}
+} );
+
+/**
+ * Show admin notice for page schema validation errors.
+ */
+add_action( 'admin_notices', function() {
+	global $post;
+	if ( ! $post ) {
+		return;
+	}
+	
+	$error = get_transient( 'aifs_page_schema_error_' . $post->ID );
+	if ( $error ) {
+		echo '<div class="notice notice-error is-dismissible">';
+		echo '<p><strong>AI Focused Schema Error:</strong> ' . esc_html( $error ) . '</p>';
+		echo '</div>';
+		delete_transient( 'aifs_page_schema_error_' . $post->ID );
+	}
 } );
 
 /**
@@ -619,7 +785,8 @@ function aifs_admin_page() {
 		<?php settings_errors( 'aifs_messages' ); ?>
 
 		<div class="aifs-shortcode-info">
-			<strong>Shortcode:</strong> Use <code>[ai_schema]</code> in your Divi footer (or anywhere else) to output the schema.
+			<strong>Shortcode:</strong> Use <code>[ai_schema]</code> in your Divi footer (or anywhere else) to output the schema.<br>
+			<strong>Page-Specific Schema:</strong> You can also override this global schema on individual posts/pages using the metabox in the post editor.
 		</div>
 
 		<!-- Plugin Settings Section -->
@@ -970,9 +1137,37 @@ function aifs_admin_page() {
 /**
  * Build the JSON-LD script tag.
  *
+ * @param int|null $post_id Optional post ID to check for page-specific schema.
  * @return string HTML script tag with JSON-LD.
  */
-function aifs_build_jsonld() {
+function aifs_build_jsonld( $post_id = null ) {
+	// Check for page-specific schema first.
+	if ( null === $post_id ) {
+		$post_id = get_the_ID();
+	}
+	
+	if ( $post_id ) {
+		$enabled = get_post_meta( $post_id, AIFS_PAGE_SCHEMA_ENABLED_META, true );
+		
+		if ( '1' === $enabled ) {
+			$page_schema_json = get_post_meta( $post_id, AIFS_PAGE_SCHEMA_META, true );
+			
+			if ( ! empty( $page_schema_json ) ) {
+				// Page-specific schema is enabled and has content.
+				// The JSON is already sanitized and encoded.
+				$parsed = json_decode( $page_schema_json, true );
+				
+				if ( json_last_error() === JSON_ERROR_NONE && ! empty( $parsed ) ) {
+					$json = wp_json_encode( $parsed, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+					if ( $json ) {
+						return '<script type="application/ld+json">' . $json . '</script>';
+					}
+				}
+			}
+		}
+	}
+	
+	// Fall back to global schema.
 	$schema = get_option( AIFS_OPTION, array() );
 
 	if ( empty( $schema ) ) {
