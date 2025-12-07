@@ -37,9 +37,21 @@ You can add or override specific fields in the global schema for individual post
 4. Enter your custom JSON-LD schema (e.g., Service schema for a service page)
 5. Save/Update the post
 
-When enabled, the page-specific schema is merged with the global schema. Page-specific values override matching fields in the global schema, while preserving other global fields.
+When enabled, the page-specific schema is merged with the global schema:
 
-**Example:** If your global schema includes your business details, and you add a Service schema on a specific page, the output will combine both - showing your business information along with the service-specific details.
+**Merging Behavior:**
+- **Different Schema Types**: When the global schema and page schema have different `@type` values (e.g., global is `LocalBusiness` and page is `Service`), they are combined using a `@graph` structure. Both schemas are preserved as separate, complete entities.
+- **Same Schema Type**: When both have the same `@type`, page-specific values override matching fields in the global schema while preserving other global fields.
+
+**Example 1 - Different Types (Service + LocalBusiness):**
+If your global schema is `LocalBusiness` with business details, and you add a `Service` schema on a specific page, the output will use a `@graph` array containing both:
+- Your complete LocalBusiness information (address, phone, reviews, etc.)
+- Your Service information (description, provider, area served, etc.)
+
+This ensures Google can understand both your business entity and the specific service offered on that page.
+
+**Example 2 - Same Type:**
+If both global and page schema are `LocalBusiness`, the page values will override/extend the global values for that specific page only.
 
 ### Manual Review Management
 
