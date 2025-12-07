@@ -137,8 +137,9 @@ function aifs_page_schema_metabox( $post ) {
 	
 	?>
 	<div class="aifs-metabox-info">
-		<strong>Page-Specific Schema:</strong> Add or override schema fields for this specific page/post. 
-		When enabled, this schema will be merged with the global schema configured in AI Schema settings. Page-specific values will override global values for matching fields.
+		<strong>Page-Specific Schema:</strong> Add custom schema for this specific page/post. 
+		When enabled, <strong>ONLY this page-specific schema</strong> will be output for this page (the global schema will not be included). 
+		This prevents duplication and keeps your sub-pages focused with only the relevant schema.
 	</div>
 	
 	<p>
@@ -1105,7 +1106,7 @@ function aifs_build_jsonld( $post_id = null ) {
 	// Start with the global schema.
 	$schema = get_option( AIFS_OPTION, array() );
 	
-	// Check for page-specific schema to merge.
+	// Check for page-specific schema.
 	if ( null === $post_id ) {
 		$post_id = get_the_ID();
 	}
@@ -1122,9 +1123,11 @@ function aifs_build_jsonld( $post_id = null ) {
 				$page_schema = json_decode( $page_schema_json, true );
 				
 				if ( json_last_error() === JSON_ERROR_NONE && ! empty( $page_schema ) ) {
-					// Merge page-specific schema with global schema.
-					// Page-specific values override global values for the same keys.
-					$schema = aifs_merge_schemas( $schema, $page_schema );
+					// On pages with page-specific schema enabled, use ONLY the page schema.
+					// This prevents duplication and schema bloat on sub-pages.
+					// The global schema (with all its nested items like reviews, offers, etc.)
+					// will only appear on pages WITHOUT page-specific schema.
+					$schema = $page_schema;
 				}
 			}
 		}
