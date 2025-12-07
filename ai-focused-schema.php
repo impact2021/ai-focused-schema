@@ -12,7 +12,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'AIFS_OPTION', 'aifs_schema_data' );
-define( 'AIFS_GMB_OPTION', 'aifs_gmb_settings' );
 define( 'AIFS_SETTINGS_OPTION', 'aifs_plugin_settings' );
 define( 'AIFS_PAGE_SCHEMA_META', '_aifs_page_schema' );
 define( 'AIFS_PAGE_SCHEMA_ENABLED_META', '_aifs_page_schema_enabled' );
@@ -24,13 +23,6 @@ register_activation_hook( __FILE__, function() {
 	if ( ! get_option( AIFS_OPTION ) ) {
 		add_option( AIFS_OPTION, array() );
 	}
-	if ( ! get_option( AIFS_GMB_OPTION ) ) {
-		add_option( AIFS_GMB_OPTION, array(
-			'api_key' => '',
-			'place_id' => '',
-			'last_sync' => '',
-		) );
-	}
 	if ( ! get_option( AIFS_SETTINGS_OPTION ) ) {
 		add_option( AIFS_SETTINGS_OPTION, array(
 			'auto_output' => 'on', // Enable by default for SEOPress compatibility
@@ -39,7 +31,7 @@ register_activation_hook( __FILE__, function() {
 } );
 
 /**
- * Admin menu: top-level menu item.
+ * Admin menu: top-level menu item and submenu pages.
  */
 add_action( 'admin_menu', function() {
 	add_menu_page(
@@ -50,6 +42,16 @@ add_action( 'admin_menu', function() {
 		'aifs_admin_page',              // Callback function
 		'dashicons-code-standards',     // Icon
 		30                              // Position (after Comments)
+	);
+	
+	// Add Documentation submenu page
+	add_submenu_page(
+		'ai-focused-schema',            // Parent slug
+		'Documentation',                // Page title
+		'Documentation',                // Menu title
+		'manage_options',               // Capability
+		'ai-focused-schema-docs',       // Menu slug
+		'aifs_docs_page'                // Callback function
 	);
 } );
 
@@ -106,9 +108,11 @@ add_action( 'admin_enqueue_scripts', function( $hook ) {
 			.aifs-form-table td select { width: 100%; max-width: 400px; }
 			.aifs-form-table td textarea { width: 100%; max-width: 600px; }
 			.aifs-json-upload { margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; }
-			.aifs-preview { background: #f5f5f5; padding: 15px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow: auto; }
+			.aifs-preview { background: #f5f5f5; padding: 15px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow: auto; position: relative; }
 			.aifs-shortcode-info { background: #e7f3ff; padding: 10px 15px; border-left: 4px solid #0073aa; margin: 15px 0; }
-			.aifs-gmb-section { margin: 20px 0; padding: 15px; background: #f0f7ff; border: 1px solid #b8d4f1; border-radius: 4px; }
+			.aifs-copy-button { position: absolute; top: 10px; right: 10px; padding: 5px 10px; background: #0073aa; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+			.aifs-copy-button:hover { background: #005a87; }
+			.aifs-copy-button.copied { background: #46b450; }
 		' );
 	}
 	
@@ -133,8 +137,8 @@ function aifs_page_schema_metabox( $post ) {
 	
 	?>
 	<div class="aifs-metabox-info">
-		<strong>Page-Specific Schema:</strong> Override the global schema for this specific page/post. 
-		When enabled, this schema will be used instead of the global schema configured in AI Schema settings.
+		<strong>Page-Specific Schema:</strong> Add or override schema fields for this specific page/post. 
+		When enabled, this schema will be merged with the global schema configured in AI Schema settings. Page-specific values will override global values for matching fields.
 	</div>
 	
 	<p>
@@ -376,46 +380,6 @@ add_action( 'admin_init', function() {
 		return;
 	}
 
-	// Handle Google My Business settings save.
-	if ( isset( $_POST['aifs_save_gmb_settings'] ) ) {
-		$nonce = isset( $_POST['aifs_gmb_nonce'] ) ? wp_unslash( $_POST['aifs_gmb_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		if ( ! wp_verify_nonce( $nonce, 'aifs_gmb_action' ) ) {
-			add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
-			return;
-		}
-
-		$gmb_settings = get_option( AIFS_GMB_OPTION, array() );
-		
-		if ( isset( $_POST['aifs_gmb'] ) && is_array( $_POST['aifs_gmb'] ) ) {
-			$gmb_input = wp_unslash( $_POST['aifs_gmb'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-			
-			$gmb_settings['api_key'] = isset( $gmb_input['api_key'] ) ? sanitize_text_field( $gmb_input['api_key'] ) : '';
-			$gmb_settings['place_id'] = isset( $gmb_input['place_id'] ) ? sanitize_text_field( $gmb_input['place_id'] ) : '';
-		}
-		
-		update_option( AIFS_GMB_OPTION, $gmb_settings );
-		add_settings_error( 'aifs_messages', 'aifs_gmb_success', 'Google My Business settings saved successfully!', 'success' );
-		return;
-	}
-
-	// Handle Google My Business reviews fetch.
-	if ( isset( $_POST['aifs_fetch_gmb_reviews'] ) ) {
-		$nonce = isset( $_POST['aifs_gmb_nonce'] ) ? wp_unslash( $_POST['aifs_gmb_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		if ( ! wp_verify_nonce( $nonce, 'aifs_gmb_action' ) ) {
-			add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
-			return;
-		}
-
-		$result = aifs_fetch_gmb_reviews();
-		
-		if ( is_wp_error( $result ) ) {
-			add_settings_error( 'aifs_messages', 'aifs_gmb_error', 'Error fetching reviews: ' . $result->get_error_message(), 'error' );
-		} else {
-			add_settings_error( 'aifs_messages', 'aifs_gmb_success', 'Successfully imported ' . $result . ' review(s) from Google My Business!', 'success' );
-		}
-		return;
-	}
-
 	// Handle plugin settings save.
 	if ( isset( $_POST['aifs_save_settings'] ) ) {
 		$nonce = isset( $_POST['aifs_settings_nonce'] ) ? wp_unslash( $_POST['aifs_settings_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
@@ -600,121 +564,6 @@ add_action( 'admin_init', function() {
 } );
 
 /**
- * Fetch reviews from Google My Business via Google Places API.
- *
- * @return int|WP_Error Number of reviews imported on success, WP_Error on failure.
- */
-function aifs_fetch_gmb_reviews() {
-	$gmb_settings = get_option( AIFS_GMB_OPTION, array() );
-	
-	$api_key = isset( $gmb_settings['api_key'] ) ? $gmb_settings['api_key'] : '';
-	$place_id = isset( $gmb_settings['place_id'] ) ? $gmb_settings['place_id'] : '';
-	
-	if ( empty( $api_key ) || empty( $place_id ) ) {
-		return new WP_Error( 'missing_credentials', 'API Key and Place ID are required.' );
-	}
-	
-	// Build the Google Places API request URL.
-	// Note: Google Places API requires the key as a URL parameter per their API documentation.
-	$url = add_query_arg(
-		array(
-			'place_id' => $place_id,
-			'fields' => 'reviews',
-			'key' => $api_key,
-		),
-		'https://maps.googleapis.com/maps/api/place/details/json'
-	);
-	
-	// Make the API request.
-	$response = wp_remote_get( $url, array( 'timeout' => 15 ) );
-	
-	if ( is_wp_error( $response ) ) {
-		return new WP_Error( 'api_error', 'Failed to connect to Google Places API: ' . $response->get_error_message() );
-	}
-	
-	$body = wp_remote_retrieve_body( $response );
-	$data = json_decode( $body, true );
-	
-	if ( ! isset( $data['status'] ) || 'OK' !== $data['status'] ) {
-		$error_msg = isset( $data['error_message'] ) ? $data['error_message'] : ( isset( $data['status'] ) ? $data['status'] : 'Unknown error' );
-		return new WP_Error( 'api_error', 'Google API error: ' . $error_msg );
-	}
-	
-	if ( ! isset( $data['result']['reviews'] ) || ! is_array( $data['result']['reviews'] ) ) {
-		return new WP_Error( 'no_reviews', 'No reviews found for this location.' );
-	}
-	
-	$schema = get_option( AIFS_OPTION, array() );
-	$gmb_reviews = $data['result']['reviews'];
-	$imported_count = 0;
-	
-	// Get existing review author names to avoid duplicates.
-	$existing_authors = array();
-	if ( isset( $schema['review'] ) && is_array( $schema['review'] ) ) {
-		foreach ( $schema['review'] as $review ) {
-			if ( isset( $review['author']['name'] ) ) {
-				$existing_authors[] = strtolower( trim( $review['author']['name'] ) );
-			}
-		}
-	} else {
-		$schema['review'] = array();
-	}
-	
-	// Transform and import GMB reviews.
-	foreach ( $gmb_reviews as $gmb_review ) {
-		$author_name = isset( $gmb_review['author_name'] ) ? sanitize_text_field( $gmb_review['author_name'] ) : '';
-		$rating = isset( $gmb_review['rating'] ) ? intval( $gmb_review['rating'] ) : 0;
-		$text = isset( $gmb_review['text'] ) ? sanitize_textarea_field( $gmb_review['text'] ) : '';
-		$time = isset( $gmb_review['time'] ) ? intval( $gmb_review['time'] ) : 0;
-		
-		// Skip if author already exists (avoid duplicates).
-		if ( in_array( strtolower( trim( $author_name ) ), $existing_authors, true ) ) {
-			continue;
-		}
-		
-		if ( ! empty( $author_name ) && $rating >= 1 && $rating <= 5 ) {
-			$new_review = array(
-				'@type'        => 'Review',
-				'author'       => array(
-					'@type' => 'Person',
-					'name'  => $author_name,
-				),
-				'reviewRating' => array(
-					'@type'       => 'Rating',
-					'ratingValue' => $rating,
-				),
-			);
-			
-			if ( ! empty( $text ) ) {
-				$new_review['reviewBody'] = $text;
-			}
-			
-			if ( $time > 0 ) {
-				$new_review['datePublished'] = gmdate( 'Y-m-d', $time );
-			}
-			
-			$schema['review'][] = $new_review;
-			$existing_authors[] = strtolower( trim( $author_name ) );
-			$imported_count++;
-		}
-	}
-	
-	// Update schema if reviews were imported.
-	if ( $imported_count > 0 ) {
-		// Update aggregate rating.
-		aifs_update_aggregate_rating( $schema );
-		update_option( AIFS_OPTION, $schema );
-	}
-	
-	// Update last sync time regardless of whether reviews were imported.
-	// This helps track API calls and debugging even when no new reviews are found.
-	$gmb_settings['last_sync'] = current_time( 'mysql' );
-	update_option( AIFS_GMB_OPTION, $gmb_settings );
-	
-	return $imported_count;
-}
-
-/**
  * Admin page HTML.
  */
 function aifs_admin_page() {
@@ -786,7 +635,7 @@ function aifs_admin_page() {
 
 		<div class="aifs-shortcode-info">
 			<strong>Shortcode:</strong> Use <code>[ai_schema]</code> in your Divi footer (or anywhere else) to output the schema.<br>
-			<strong>Page-Specific Schema:</strong> You can also override this global schema on individual posts/pages using the metabox in the post editor.
+			<strong>Page-Specific Schema:</strong> You can add or override fields on individual posts/pages using the metabox in the post editor. Page-specific values will be merged with this global schema.
 		</div>
 
 		<!-- Plugin Settings Section -->
@@ -993,52 +842,9 @@ function aifs_admin_page() {
 			<?php submit_button( 'Save Changes', 'primary', 'aifs_save_fields' ); ?>
 		</form>
 
-		<!-- Google My Business Settings Section -->
-		<h2>Google My Business Integration</h2>
-		<p>Connect your Google My Business account to automatically import reviews. You'll need a Google Places API key and your Place ID.</p>
-		
-		<?php
-		$gmb_settings = get_option( AIFS_GMB_OPTION, array() );
-		$gmb_api_key = isset( $gmb_settings['api_key'] ) ? $gmb_settings['api_key'] : '';
-		$gmb_place_id = isset( $gmb_settings['place_id'] ) ? $gmb_settings['place_id'] : '';
-		$gmb_last_sync = isset( $gmb_settings['last_sync'] ) ? $gmb_settings['last_sync'] : '';
-		?>
-		
-		<form method="post">
-			<?php wp_nonce_field( 'aifs_gmb_action', 'aifs_gmb_nonce' ); ?>
-			<table class="form-table aifs-form-table">
-				<tr>
-					<th><label for="aifs_gmb_api_key">Google Places API Key *</label></th>
-					<td>
-						<input type="text" id="aifs_gmb_api_key" name="aifs_gmb[api_key]" value="<?php echo esc_attr( $gmb_api_key ); ?>" />
-						<p class="description">Get your API key from the <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a>. Enable the Places API.</p>
-					</td>
-				</tr>
-				<tr>
-					<th><label for="aifs_gmb_place_id">Place ID *</label></th>
-					<td>
-						<input type="text" id="aifs_gmb_place_id" name="aifs_gmb[place_id]" value="<?php echo esc_attr( $gmb_place_id ); ?>" />
-						<p class="description">Find your Place ID using the <a href="https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder" target="_blank">Place ID Finder</a>.</p>
-					</td>
-				</tr>
-				<?php if ( ! empty( $gmb_last_sync ) ) : ?>
-				<tr>
-					<th>Last Sync</th>
-					<td><?php echo esc_html( $gmb_last_sync ); ?></td>
-				</tr>
-				<?php endif; ?>
-			</table>
-			
-			<?php submit_button( 'Save GMB Settings', 'secondary', 'aifs_save_gmb_settings', false ); ?>
-			&nbsp;
-			<?php if ( ! empty( $gmb_api_key ) && ! empty( $gmb_place_id ) ) : ?>
-				<?php submit_button( 'Fetch Reviews from Google', 'primary', 'aifs_fetch_gmb_reviews', false ); ?>
-			<?php endif; ?>
-		</form>
-
 		<!-- Reviews Management Section -->
 		<h2>Customer Reviews</h2>
-		<p>Reviews can be added manually below or imported automatically from Google My Business using the settings above. The aggregate rating and rating count will be automatically calculated.</p>
+		<p>Add customer reviews manually to your schema. The aggregate rating and rating count will be automatically calculated.</p>
 
 		<?php
 		$existing_reviews = isset( $schema['review'] ) && is_array( $schema['review'] ) ? $schema['review'] : array();
@@ -1128,10 +934,165 @@ function aifs_admin_page() {
 		<!-- JSON Preview -->
 		<h2>Schema Preview</h2>
 		<p>This is the JSON-LD that will be output by the <code>[ai_schema]</code> shortcode:</p>
-		<div class="aifs-preview"><?php echo esc_html( $json_preview ); ?></div>
+		<div class="aifs-preview">
+			<button class="aifs-copy-button" onclick="aifsCopySchema(this)">Copy Code</button>
+			<pre id="aifs-schema-code"><?php echo esc_html( $json_preview ); ?></pre>
+		</div>
+
+		<script>
+		function aifsCopySchema(button) {
+			var schemaCode = document.getElementById('aifs-schema-code').textContent;
+			
+			// Use the Clipboard API if available
+			if (navigator.clipboard && window.isSecureContext) {
+				navigator.clipboard.writeText(schemaCode).then(function() {
+					button.textContent = 'Copied!';
+					button.classList.add('copied');
+					setTimeout(function() {
+						button.textContent = 'Copy Code';
+						button.classList.remove('copied');
+					}, 2000);
+				}).catch(function(err) {
+					console.error('Failed to copy:', err);
+					alert('Failed to copy to clipboard');
+				});
+			} else {
+				// Fallback for older browsers
+				var textarea = document.createElement('textarea');
+				textarea.value = schemaCode;
+				textarea.style.position = 'fixed';
+				textarea.style.opacity = '0';
+				document.body.appendChild(textarea);
+				textarea.select();
+				try {
+					document.execCommand('copy');
+					button.textContent = 'Copied!';
+					button.classList.add('copied');
+					setTimeout(function() {
+						button.textContent = 'Copy Code';
+						button.classList.remove('copied');
+					}, 2000);
+				} catch (err) {
+					console.error('Failed to copy:', err);
+					alert('Failed to copy to clipboard');
+				}
+				document.body.removeChild(textarea);
+			}
+		}
+		</script>
 
 	</div>
 	<?php
+}
+
+/**
+ * Documentation page HTML.
+ */
+function aifs_docs_page() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	
+	// Get README content
+	$readme_path = plugin_dir_path( __FILE__ ) . 'README.md';
+	$readme_content = '';
+	
+	if ( file_exists( $readme_path ) && filesize( $readme_path ) < 500000 ) {
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$readme_content = file_get_contents( $readme_path );
+	}
+	
+	?>
+	<div class="wrap">
+		<h1>AI Focused Schema - Documentation</h1>
+		
+		<div style="max-width: 900px; background: #fff; padding: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04);">
+			<?php
+			// Simple markdown-to-HTML conversion for display
+			$html_content = aifs_simple_markdown_to_html( $readme_content );
+			// Output is already escaped by the conversion function
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			echo $html_content;
+			?>
+		</div>
+	</div>
+	<?php
+}
+
+/**
+ * Simple markdown to HTML converter.
+ *
+ * @param string $markdown Markdown content.
+ * @return string HTML content.
+ */
+function aifs_simple_markdown_to_html( $markdown ) {
+	if ( empty( $markdown ) ) {
+		return '<p>Documentation not found.</p>';
+	}
+	
+	$html = esc_html( $markdown );
+	
+	// Convert headers
+	$html = preg_replace( '/^### (.+)$/m', '<h3>$1</h3>', $html );
+	$html = preg_replace( '/^## (.+)$/m', '<h2>$1</h2>', $html );
+	$html = preg_replace( '/^# (.+)$/m', '<h1>$1</h1>', $html );
+	
+	// Convert bold
+	$html = preg_replace( '/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $html );
+	
+	// Convert inline code
+	$html = preg_replace( '/`([^`]+)`/', '<code>$1</code>', $html );
+	
+	// Convert links
+	$html = preg_replace( '/\[([^\]]+)\]\(([^\)]+)\)/', '<a href="$2" target="_blank">$1</a>', $html );
+	
+	// Convert lists (mark differently first)
+	$html = preg_replace( '/^- (.+)$/m', '<!--UL--><li>$1</li>', $html );
+	$html = preg_replace( '/^\d+\. (.+)$/m', '<!--OL--><li>$1</li>', $html );
+	
+	// Wrap consecutive list items
+	$html = preg_replace( '/((?:<!--UL--><li>.*<\/li>\n?)+)/s', '<ul>$1</ul>', $html );
+	$html = preg_replace( '/((?:<!--OL--><li>.*<\/li>\n?)+)/s', '<ol>$1</ol>', $html );
+	
+	// Remove markers
+	$html = str_replace( '<!--UL-->', '', $html );
+	$html = str_replace( '<!--OL-->', '', $html );
+	
+	// Convert paragraphs (lines separated by blank lines)
+	$lines = explode( "\n", $html );
+	$result = array();
+	$paragraph = '';
+	
+	foreach ( $lines as $line ) {
+		$trimmed = trim( $line );
+		
+		// Check if line is a heading, list item, or empty
+		if ( preg_match( '/^<h[1-6]>/', $trimmed ) || 
+		     preg_match( '/^<\/?(ul|ol|li)>/', $trimmed ) ||
+		     empty( $trimmed ) ) {
+			// End current paragraph if exists
+			if ( ! empty( $paragraph ) ) {
+				$result[] = '<p>' . trim( $paragraph ) . '</p>';
+				$paragraph = '';
+			}
+			if ( ! empty( $trimmed ) ) {
+				$result[] = $trimmed;
+			}
+		} else {
+			// Accumulate paragraph content
+			if ( ! empty( $paragraph ) ) {
+				$paragraph .= ' ';
+			}
+			$paragraph .= $trimmed;
+		}
+	}
+	
+	// Add final paragraph if exists
+	if ( ! empty( $paragraph ) ) {
+		$result[] = '<p>' . trim( $paragraph ) . '</p>';
+	}
+	
+	return implode( "\n", $result );
 }
 
 /**
@@ -1141,7 +1102,10 @@ function aifs_admin_page() {
  * @return string HTML script tag with JSON-LD.
  */
 function aifs_build_jsonld( $post_id = null ) {
-	// Check for page-specific schema first.
+	// Start with the global schema.
+	$schema = get_option( AIFS_OPTION, array() );
+	
+	// Check for page-specific schema to merge.
 	if ( null === $post_id ) {
 		$post_id = get_the_ID();
 	}
@@ -1155,21 +1119,17 @@ function aifs_build_jsonld( $post_id = null ) {
 			if ( ! empty( $page_schema_json ) ) {
 				// Page-specific schema is enabled and has content.
 				// The JSON is already sanitized and encoded.
-				$parsed = json_decode( $page_schema_json, true );
+				$page_schema = json_decode( $page_schema_json, true );
 				
-				if ( json_last_error() === JSON_ERROR_NONE && ! empty( $parsed ) ) {
-					$json = wp_json_encode( $parsed, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
-					if ( $json ) {
-						return '<script type="application/ld+json">' . $json . '</script>';
-					}
+				if ( json_last_error() === JSON_ERROR_NONE && ! empty( $page_schema ) ) {
+					// Merge page-specific schema with global schema.
+					// Page-specific values override global values for the same keys.
+					$schema = aifs_merge_schemas( $schema, $page_schema );
 				}
 			}
 		}
 	}
 	
-	// Fall back to global schema.
-	$schema = get_option( AIFS_OPTION, array() );
-
 	if ( empty( $schema ) ) {
 		return '';
 	}
@@ -1183,6 +1143,58 @@ function aifs_build_jsonld( $post_id = null ) {
 	}
 
 	return '<script type="application/ld+json">' . $json . '</script>';
+}
+
+/**
+ * Merge two schema arrays, with page-specific values overriding global values.
+ *
+ * @param array $global_schema Global schema data.
+ * @param array $page_schema Page-specific schema data.
+ * @return array Merged schema.
+ */
+function aifs_merge_schemas( $global_schema, $page_schema ) {
+	if ( empty( $global_schema ) ) {
+		return $page_schema;
+	}
+	
+	if ( empty( $page_schema ) ) {
+		return $global_schema;
+	}
+	
+	// Start with global schema
+	$merged = $global_schema;
+	
+	// Merge page-specific values
+	foreach ( $page_schema as $key => $value ) {
+		if ( is_array( $value ) && isset( $merged[ $key ] ) && is_array( $merged[ $key ] ) ) {
+			// For nested arrays, merge recursively
+			// But only if neither is an indexed array (like reviews)
+			if ( aifs_is_associative_array( $value ) && aifs_is_associative_array( $merged[ $key ] ) ) {
+				$merged[ $key ] = aifs_merge_schemas( $merged[ $key ], $value );
+			} else {
+				// For indexed arrays or mixed, replace entirely
+				$merged[ $key ] = $value;
+			}
+		} else {
+			// Replace or add the value
+			$merged[ $key ] = $value;
+		}
+	}
+	
+	return $merged;
+}
+
+/**
+ * Check if an array is associative (vs indexed).
+ *
+ * @param array $arr Array to check.
+ * @return bool True if associative.
+ */
+function aifs_is_associative_array( $arr ) {
+	if ( ! is_array( $arr ) || empty( $arr ) ) {
+		return false;
+	}
+	return array_keys( $arr ) !== range( 0, count( $arr ) - 1 );
 }
 
 /**
