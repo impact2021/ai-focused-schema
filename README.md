@@ -1,16 +1,16 @@
 # AI Focused Schema
 
-A WordPress plugin for managing JSON-LD schema with support for Google My Business review integration and page-specific schema overrides.
+A WordPress plugin for managing JSON-LD schema with support for page-specific schema overrides and manual review management.
 
 ## Features
 
 - Upload and manage JSON-LD schema via WordPress admin
 - Edit schema fields through a user-friendly interface
-- **Page-Specific Schema**: Override global schema for individual posts/pages
+- **Page-Specific Schema**: Merge page-specific schema with global schema for individual posts/pages
 - **Automatic Output**: Schema automatically added to page `<head>` for SEO tools and search engines
-- **Google My Business Integration**: Automatically import reviews from your Google My Business profile
 - Manual review management with aggregate rating calculation
 - Output schema via shortcode `[ai_schema]` for use in Divi footer or anywhere in your site
+- **Documentation Page**: Built-in documentation accessible from the admin menu
 
 ## Installation
 
@@ -29,39 +29,17 @@ A WordPress plugin for managing JSON-LD schema with support for Google My Busine
 
 ### Page-Specific Schema
 
-You can override the global schema for individual posts or pages:
+You can add or override specific fields in the global schema for individual posts or pages:
 
 1. Edit any post or page in WordPress
 2. Scroll down to the **AI Focused Schema - Page Specific** metabox
 3. Check "Enable page-specific schema for this page/post"
-4. Enter your custom JSON-LD schema (e.g., Article schema for blog posts)
+4. Enter your custom JSON-LD schema (e.g., Service schema for a service page)
 5. Save/Update the post
 
-When enabled, the page-specific schema replaces the global schema for that page only.
+When enabled, the page-specific schema is merged with the global schema. Page-specific values override matching fields in the global schema, while preserving other global fields.
 
-### Google My Business Integration
-
-To automatically import reviews from Google My Business:
-
-1. **Get a Google Places API Key**:
-   - Visit the [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - Create a new project or select an existing one
-   - Enable the **Places API**
-   - Create an API key
-
-2. **Find Your Place ID**:
-   - Use the [Place ID Finder](https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder)
-   - Search for your business and copy the Place ID
-
-3. **Configure the Plugin**:
-   - In the **Google My Business Integration** section, enter your API key and Place ID
-   - Click **Save GMB Settings**
-   - Click **Fetch Reviews from Google** to import reviews
-
-4. **Review Management**:
-   - Reviews are automatically deduplicated by author name
-   - Aggregate ratings are calculated automatically
-   - You can also add manual reviews alongside imported ones
+**Example:** If your global schema includes your business details, and you add a Service schema on a specific page, the output will combine both - showing your business information along with the service-specific details.
 
 ### Manual Review Management
 
@@ -97,4 +75,3 @@ SEOpress showing "no schema" simply means SEOpress itself isn't managing any sch
 
 - WordPress 5.0 or higher
 - PHP 7.0 or higher
-- For GMB integration: Google Places API key with Places API enabled
