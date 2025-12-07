@@ -303,6 +303,8 @@ add_action( 'admin_init', function() {
 			}
 			// Recalculate aggregate rating.
 			aifs_update_aggregate_rating( $schema );
+			// Sanitize schema to ensure no reviews have aggregateRating.
+			$schema = aifs_sanitize_schema_data( $schema );
 			update_option( AIFS_OPTION, $schema );
 			add_settings_error( 'aifs_messages', 'aifs_review_deleted', 'Review deleted successfully!', 'success' );
 		}
@@ -372,6 +374,8 @@ add_action( 'admin_init', function() {
 				// Update aggregate rating based on all reviews.
 				aifs_update_aggregate_rating( $schema );
 
+				// Sanitize schema to ensure no reviews have aggregateRating.
+				$schema = aifs_sanitize_schema_data( $schema );
 				update_option( AIFS_OPTION, $schema );
 				add_settings_error( 'aifs_messages', 'aifs_review_success', 'Review added successfully!', 'success' );
 			} else {
@@ -559,6 +563,8 @@ add_action( 'admin_init', function() {
 			}
 		}
 
+		// Sanitize schema to ensure no reviews have aggregateRating.
+		$schema = aifs_sanitize_schema_data( $schema );
 		update_option( AIFS_OPTION, $schema );
 		add_settings_error( 'aifs_messages', 'aifs_fields_success', 'Schema fields updated successfully!', 'success' );
 	}
