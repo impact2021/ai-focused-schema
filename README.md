@@ -29,7 +29,7 @@ A WordPress plugin for managing JSON-LD schema with support for page-specific sc
 
 ### Page-Specific Schema
 
-You can add or override specific fields in the global schema for individual posts or pages:
+You can add custom schema for individual posts or pages:
 
 1. Edit any post or page in WordPress
 2. Scroll down to the **AI Focused Schema - Page Specific** metabox
@@ -37,21 +37,23 @@ You can add or override specific fields in the global schema for individual post
 4. Enter your custom JSON-LD schema (e.g., Service schema for a service page)
 5. Save/Update the post
 
-When enabled, the page-specific schema is merged with the global schema:
+**How It Works:**
 
-**Merging Behavior:**
-- **Different Schema Types**: When the global schema and page schema have different `@type` values (e.g., global is `LocalBusiness` and page is `Service`), they are combined using a `@graph` structure. Both schemas are preserved as separate, complete entities.
-- **Same Schema Type**: When both have the same `@type`, page-specific values override matching fields in the global schema while preserving other global fields.
+When page-specific schema is enabled for a page, **ONLY the page-specific schema** is output for that page. The global schema is NOT included to prevent duplication and schema bloat.
 
-**Example 1 - Different Types (Service + LocalBusiness):**
-If your global schema is `LocalBusiness` with business details, and you add a `Service` schema on a specific page, the output will use a `@graph` array containing both:
-- Your complete LocalBusiness information (address, phone, reviews, etc.)
-- Your Service information (description, provider, area served, etc.)
+**Why This Approach?**
 
-This ensures Google can understand both your business entity and the specific service offered on that page.
+- **Prevents Duplication**: Your global schema may contain many nested items (reviews, offers, administrative areas, etc.). If we merged it with page-specific schema, you could end up with duplicate Service types and inflated schema item counts.
+- **Cleaner Sub-Pages**: Service pages, product pages, and other sub-pages get focused, relevant schema without the overhead of your full business schema.
+- **Homepage Gets Full Schema**: Pages WITHOUT page-specific schema (like your homepage) will display the complete global schema with all reviews, offers, and business details.
 
-**Example 2 - Same Type:**
-If both global and page schema are `LocalBusiness`, the page values will override/extend the global values for that specific page only.
+**Example:**
+
+- **Homepage** (no page-specific schema): Outputs your complete LocalBusiness schema with reviews, services, opening hours, etc.
+- **Service Page** (page-specific schema enabled): Outputs ONLY the Service schema you defined for that page.
+- **About Page** (no page-specific schema): Outputs your complete LocalBusiness schema.
+
+This approach ensures each page has appropriate, focused schema without unnecessary duplication.
 
 ### Manual Review Management
 
