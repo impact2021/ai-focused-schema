@@ -1314,15 +1314,15 @@ function aifs_sanitize_schema_data( $data ) {
 		$is_review = isset( $data['@type'] ) && 'Review' === $data['@type'];
 		
 		foreach ( $data as $key => $value ) {
-			// Sanitize keys to prevent injection.
-			$clean_key = sanitize_text_field( $key );
-			
-			// Remove aggregateRating from Review objects to prevent "Review has multiple aggregate ratings" error
+			// Remove aggregateRating from Review objects BEFORE sanitizing the key
 			// aggregateRating should only exist on the parent entity (LocalBusiness, Product, etc.), not on individual reviews
-			if ( $is_review && 'aggregateRating' === $clean_key ) {
+			// This prevents "Review has multiple aggregate ratings" schema validation error
+			if ( $is_review && 'aggregateRating' === $key ) {
 				continue; // Skip this property for Review objects
 			}
 			
+			// Sanitize keys to prevent injection.
+			$clean_key = sanitize_text_field( $key );
 			$sanitized[ $clean_key ] = aifs_sanitize_schema_data( $value );
 		}
 		return $sanitized;
