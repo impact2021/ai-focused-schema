@@ -74,6 +74,12 @@ wp_add_inline_script( 'wp-admin', '
 document.addEventListener("DOMContentLoaded", function() {
 	var copyButton = document.getElementById("aifs-copy-schema");
 	if (copyButton) {
+		// Check if Clipboard API is available
+		if (!navigator.clipboard) {
+			copyButton.style.display = "none";
+			return;
+		}
+		
 		copyButton.addEventListener("click", function() {
 			var previewDiv = document.querySelector(".aifs-preview");
 			var schemaText = previewDiv ? previewDiv.textContent : "";
