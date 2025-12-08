@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 exit;
 }
 
+// Load GitHub update checker
+require_once plugin_dir_path( __FILE__ ) . 'ai-focused-schema-github-updates.php';
+
 define( 'AIFS_OPTION', 'aifs_schema_data' );
 
 /**
