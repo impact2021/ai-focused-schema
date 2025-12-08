@@ -2,8 +2,8 @@
 /**
  * Plugin Name: AI Focused Schema
  * Description: Upload JSON-LD schema, edit fields in admin, and output via shortcode [ai_schema] for use in your Divi footer.
- * Version: 2.1
- * Author: Impact Websites
+ * Version: 2.2
+ * Author: Impact Websites 0210559077
  * License: GPLv2+
  * GitHub Plugin URI: https://github.com/impact2021/ai-focused-schema
  * Primary Branch: main
@@ -737,3 +737,4 @@ return null;
 }
 return $data;
 }
+
