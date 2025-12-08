@@ -278,6 +278,8 @@ add_action( 'admin_init', function() {
 		}
 
 		// Sanitize the parsed JSON recursively.
+		// First update aggregate rating if there are reviews.
+		aifs_update_aggregate_rating( $parsed );
 		$sanitized = aifs_sanitize_schema_data( $parsed );
 		update_option( AIFS_OPTION, $sanitized );
 		add_settings_error( 'aifs_messages', 'aifs_json_success', 'Schema JSON uploaded successfully!', 'success' );
@@ -565,6 +567,8 @@ add_action( 'admin_init', function() {
 			}
 		}
 
+		// Update aggregate rating if there are reviews.
+		aifs_update_aggregate_rating( $schema );
 		// Sanitize schema to ensure no reviews have aggregateRating.
 		$schema = aifs_sanitize_schema_data( $schema );
 		update_option( AIFS_OPTION, $schema );
