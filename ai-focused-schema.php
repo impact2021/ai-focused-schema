@@ -14,7 +14,10 @@ exit;
 }
 
 // Load GitHub update checker
-require_once plugin_dir_path( __FILE__ ) . 'ai-focused-schema-github-updates.php';
+$github_updater = plugin_dir_path( __FILE__ ) . 'ai-focused-schema-github-updates.php';
+if ( file_exists( $github_updater ) ) {
+	require_once $github_updater;
+}
 
 define( 'AIFS_OPTION', 'aifs_schema_data' );
 
