@@ -18,6 +18,15 @@ A WordPress plugin for managing JSON-LD schema with support for page-specific sc
 2. Activate the plugin through the 'Plugins' menu in WordPress
 3. Go to Settings > AI Focused Schema to configure
 
+## Automatic Updates
+
+This plugin supports automatic updates via the [Git Updater](https://git-updater.com/) plugin. If you have Git Updater installed, the plugin will automatically check for updates from the GitHub repository and display "Update now" in your WordPress admin when new versions are available.
+
+To enable automatic updates:
+1. Install and activate the [Git Updater](https://git-updater.com/) plugin
+2. The plugin will automatically detect updates from https://github.com/impact2021/ai-focused-schema
+3. Updates will appear in your WordPress admin under Plugins
+
 ## Usage
 
 ### Basic Setup
