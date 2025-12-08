@@ -85,6 +85,149 @@ SEOpress showing "no schema" simply means SEOpress itself isn't managing any sch
 - `[ai_entity_profile]` - Backwards compatible shortcode
 - `[impact_gbp_schema]` - Backwards compatible shortcode
 
+## Schema Best Practices for AI Search
+
+To optimize your schema for AI-powered search engines and large language models, follow these best practices:
+
+### 1. URL Consistency
+
+- Use consistent URLs throughout your schema
+- Use `@id` without trailing slash: `"@id": "https://www.example.com"`
+- Use `url` with trailing slash: `"url": "https://www.example.com/"`
+- Be consistent across all URL references
+
+### 2. Rich Descriptions with Keywords
+
+Include location and service keywords naturally in descriptions:
+
+```json
+{
+  "description": "Your Business offers custom website design, hosting, and SEO services across [Location] and [Region]."
+}
+```
+
+AI systems use these keywords to match queries like "[Location] web design" or "[Region] SEO services".
+
+### 3. Use Schema.org Standard Types
+
+Instead of free-text categories, use proper schema.org types:
+
+- `ProfessionalService` - For professional service businesses
+- `LocalBusiness` - For local businesses
+- Specific subtypes like `WebDesignService`, `Store`, `Restaurant`, etc.
+
+### 4. Multiple Contact Points
+
+Provide separate contact points for different departments:
+
+```json
+{
+  "contactPoint": [
+    {
+      "@type": "ContactPoint",
+      "telephone": "+1-xxx-xxx-xxxx",
+      "contactType": "sales",
+      "email": "sales@example.com"
+    },
+    {
+      "@type": "ContactPoint",
+      "telephone": "+1-xxx-xxx-xxxx",
+      "contactType": "customer support",
+      "email": "support@example.com"
+    }
+  ]
+}
+```
+
+### 5. Comprehensive Area Served
+
+List both specific locations and broader areas:
+
+```json
+{
+  "areaServed": [
+    {
+      "@type": "City",
+      "name": "Your City"
+    },
+    {
+      "@type": "Country",
+      "name": "Your Country"
+    }
+  ]
+}
+```
+
+AI often uses broader areas to match location-based queries.
+
+### 6. Main Entity Reference
+
+Connect your schema to your homepage:
+
+```json
+{
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://www.example.com/"
+  }
+}
+```
+
+### 7. Image and Logo Properties
+
+Include dimensions for better rendering in rich results:
+
+```json
+{
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://www.example.com/logo.png",
+    "width": "512",
+    "height": "512"
+  },
+  "image": {
+    "@type": "ImageObject",
+    "url": "https://www.example.com/image.jpg",
+    "width": "1200",
+    "height": "630"
+  }
+}
+```
+
+### 8. Service Type in Offers
+
+Add `serviceType` to each service for clarity:
+
+```json
+{
+  "itemOffered": {
+    "@type": "Service",
+    "name": "Website Design",
+    "serviceType": "Web Design",
+    "description": "Professional website design services..."
+  }
+}
+```
+
+### 9. Complete Review Ratings
+
+Include `bestRating` and `worstRating` in all review ratings:
+
+```json
+{
+  "reviewRating": {
+    "@type": "Rating",
+    "ratingValue": 5,
+    "bestRating": 5,
+    "worstRating": 1
+  }
+}
+```
+
+### 10. Example Schema
+
+See `example-schema.json` for a complete implementation of all these best practices.
+
 ## Requirements
 
 - WordPress 5.0 or higher
