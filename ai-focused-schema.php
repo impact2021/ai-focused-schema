@@ -1150,6 +1150,10 @@ function aifs_build_jsonld( $post_id = null ) {
 		return '';
 	}
 
+	// Recalculate aggregate rating at output time to ensure it's always current.
+	// This handles cases where schema was saved before aggregate rating fixes were added.
+	aifs_update_aggregate_rating( $schema );
+
 	// wp_json_encode handles all escaping and prevents XSS.
 	// All schema data is sanitized via aifs_sanitize_schema_data() on input.
 	$json = wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
