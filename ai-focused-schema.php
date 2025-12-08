@@ -213,7 +213,8 @@ add_action( 'save_post', function( $post_id ) {
 				// Add admin notice (will be shown on next page load).
 				set_transient( 'aifs_page_schema_error_' . $post_id, 'Invalid JSON: ' . json_last_error_msg(), 45 );
 			} else {
-				// Valid JSON - sanitize and save.
+				// Valid JSON - update aggregate rating if there are reviews, then sanitize and save.
+				aifs_update_aggregate_rating( $parsed );
 				$sanitized = aifs_sanitize_schema_data( $parsed );
 				$sanitized_json = wp_json_encode( $sanitized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 				update_post_meta( $post_id, AIFS_PAGE_SCHEMA_META, $sanitized_json );
