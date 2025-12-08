@@ -519,6 +519,11 @@ $json_preview = ! empty( $schema ) ? wp_json_encode( $schema, JSON_PRETTY_PRINT 
 </tr>
 </table>
 
+<!-- JSON Preview -->
+<h2>Schema Preview</h2>
+<p>This is the JSON-LD that will be output by the <code>[ai_schema]</code> shortcode:</p>
+<div class="aifs-preview"><?php echo esc_html( $json_preview ); ?></div>
+
 <?php submit_button( 'Save Changes', 'primary', 'aifs_save_fields' ); ?>
 </form>
 
@@ -610,11 +615,6 @@ $agg_rating = $schema['aggregateRating'];
 </table>
 <?php submit_button( 'Add Review', 'secondary', 'aifs_save_review' ); ?>
 </form>
-
-<!-- JSON Preview -->
-<h2>Schema Preview</h2>
-<p>This is the JSON-LD that will be output by the <code>[ai_schema]</code> shortcode:</p>
-<div class="aifs-preview"><?php echo esc_html( $json_preview ); ?></div>
 
 </div>
 <?php
