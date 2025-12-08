@@ -5,6 +5,8 @@
  * Version: 2.0
  * Author: Copilot (adapted for impact2021)
  * License: GPLv2+
+ * GitHub Plugin URI: https://github.com/impact2021/ai-focused-schema
+ * Primary Branch: main
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
