@@ -64,6 +64,37 @@ wp_add_inline_style( 'wp-admin', '
 .aifs-json-upload { margin-bottom: 20px; padding: 15px; background: #f9f9f9; border: 1px solid #ddd; }
 .aifs-preview { background: #f5f5f5; padding: 15px; border: 1px solid #ccc; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow: auto; }
 .aifs-shortcode-info { background: #e7f3ff; padding: 10px 15px; border-left: 4px solid #0073aa; margin: 15px 0; }
+.aifs-preview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.aifs-preview-header h2 { margin: 0; }
+.aifs-copy-button { margin-left: 15px; }
+.aifs-copy-success { color: #46b450; font-weight: 600; margin-left: 10px; display: none; }
+' );
+
+wp_add_inline_script( 'wp-admin', '
+document.addEventListener("DOMContentLoaded", function() {
+	var copyButton = document.getElementById("aifs-copy-schema");
+	if (copyButton) {
+		copyButton.addEventListener("click", function() {
+			var previewDiv = document.querySelector(".aifs-preview");
+			var schemaText = previewDiv ? previewDiv.textContent : "";
+			
+			if (schemaText) {
+				navigator.clipboard.writeText(schemaText).then(function() {
+					var successMsg = document.getElementById("aifs-copy-success");
+					if (successMsg) {
+						successMsg.style.display = "inline";
+						setTimeout(function() {
+							successMsg.style.display = "none";
+						}, 2000);
+					}
+				}).catch(function(err) {
+					console.error("Failed to copy text: ", err);
+					alert("Failed to copy to clipboard. Please try again.");
+				});
+			}
+		});
+	}
+});
 ' );
 } );
 
@@ -528,7 +559,13 @@ $json_preview = ! empty( $schema ) ? wp_json_encode( $schema, JSON_PRETTY_PRINT 
 </table>
 
 <!-- JSON Preview -->
-<h2>Schema Preview</h2>
+<div class="aifs-preview-header">
+	<h2>Schema Preview</h2>
+	<div>
+		<button type="button" id="aifs-copy-schema" class="button button-secondary aifs-copy-button">Copy Code</button>
+		<span id="aifs-copy-success" class="aifs-copy-success">✓ Copied!</span>
+	</div>
+</div>
 <p>This is the JSON-LD that will be output by the <code>[ai_schema]</code> shortcode:</p>
 <div class="aifs-preview"><?php echo esc_html( $json_preview ); ?></div>
 
