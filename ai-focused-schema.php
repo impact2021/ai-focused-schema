@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Focused Schema
  * Description: Upload JSON-LD schema, edit fields in admin, and output via shortcode [ai_schema] for use in your Divi footer.
- * Version: 2.0
+ * Version: 2.1
  * Author: Impact Websites
  * License: GPLv2+
  * GitHub Plugin URI: https://github.com/impact2021/ai-focused-schema
@@ -276,7 +276,8 @@ if ( isset( $input['openingHours'] ) ) {
 $hours = sanitize_textarea_field( $input['openingHours'] );
 if ( ! empty( $hours ) ) {
 $lines = array_filter( array_map( 'trim', preg_split( '/
-||
+|
+|
 /', $hours ) ) );
 if ( ! empty( $lines ) ) {
 $schema['openingHours'] = array_values( $lines );
@@ -291,7 +292,8 @@ if ( isset( $input['sameAs'] ) ) {
 $same_as = sanitize_textarea_field( $input['sameAs'] );
 if ( ! empty( $same_as ) ) {
 $lines = array_filter( array_map( 'trim', preg_split( '/
-||
+|
+|
 /', $same_as ) ) );
 if ( ! empty( $lines ) ) {
 $schema['sameAs'] = array_values( $lines );
