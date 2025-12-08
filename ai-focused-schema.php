@@ -35,7 +35,7 @@ add_option( AIFS_OPTION, array() );
  */
 add_action( 'admin_menu', function() {
 add_menu_page(
-'AI Focused Schema',
+'AI Focused Schema by Impact Websites',
 'AI Schema',
 'manage_options',
 'ai-focused-schema',
