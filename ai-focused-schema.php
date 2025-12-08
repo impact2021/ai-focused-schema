@@ -213,7 +213,8 @@ add_action( 'save_post', function( $post_id ) {
 				// Add admin notice (will be shown on next page load).
 				set_transient( 'aifs_page_schema_error_' . $post_id, 'Invalid JSON: ' . json_last_error_msg(), 45 );
 			} else {
-				// Valid JSON - sanitize and save.
+				// Valid JSON - update aggregate rating if there are reviews, then sanitize and save.
+				aifs_update_aggregate_rating( $parsed );
 				$sanitized = aifs_sanitize_schema_data( $parsed );
 				$sanitized_json = wp_json_encode( $sanitized, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 				update_post_meta( $post_id, AIFS_PAGE_SCHEMA_META, $sanitized_json );
@@ -278,6 +279,8 @@ add_action( 'admin_init', function() {
 		}
 
 		// Sanitize the parsed JSON recursively.
+		// First update aggregate rating if there are reviews.
+		aifs_update_aggregate_rating( $parsed );
 		$sanitized = aifs_sanitize_schema_data( $parsed );
 		update_option( AIFS_OPTION, $sanitized );
 		add_settings_error( 'aifs_messages', 'aifs_json_success', 'Schema JSON uploaded successfully!', 'success' );
@@ -565,6 +568,8 @@ add_action( 'admin_init', function() {
 			}
 		}
 
+		// Update aggregate rating if there are reviews.
+		aifs_update_aggregate_rating( $schema );
 		// Sanitize schema to ensure no reviews have aggregateRating.
 		$schema = aifs_sanitize_schema_data( $schema );
 		update_option( AIFS_OPTION, $schema );
