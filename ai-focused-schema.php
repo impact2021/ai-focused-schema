@@ -166,6 +166,8 @@ $new_review = array(
 'reviewRating' => array(
 '@type'       => 'Rating',
 'ratingValue' => $rating,
+'bestRating'  => 5,
+'worstRating' => 1,
 ),
 );
 
@@ -686,6 +688,8 @@ $schema['aggregateRating'] = array(
 '@type'       => 'AggregateRating',
 'ratingValue' => round( $rating_value, 1 ),
 'ratingCount' => $rating_count,
+'bestRating'  => 5,
+'worstRating' => 1,
 );
 } elseif ( isset( $schema['aggregateRating'] ) ) {
 unset( $schema['aggregateRating'] );

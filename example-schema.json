@@ -1,0 +1,197 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ProfessionalService",
+  "@id": "https://www.impactwebsites.co.nz",
+  "name": "Impact Websites",
+  "description": "Impact Websites offers custom website design, hosting, and SEO services across Auckland and New Zealand.",
+  "url": "https://www.impactwebsites.co.nz/",
+  "telephone": "+64-9-123-4567",
+  "email": "info@impactwebsites.co.nz",
+  "priceRange": "$$",
+  "image": {
+    "@type": "ImageObject",
+    "url": "https://www.impactwebsites.co.nz/images/business-photo.jpg",
+    "width": "1200",
+    "height": "630"
+  },
+  "logo": {
+    "@type": "ImageObject",
+    "url": "https://www.impactwebsites.co.nz/images/logo.png",
+    "width": "512",
+    "height": "512"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://www.impactwebsites.co.nz/"
+  },
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "123 Queen Street",
+    "addressLocality": "Auckland",
+    "addressRegion": "Auckland",
+    "postalCode": "1010",
+    "addressCountry": "NZ"
+  },
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": -36.8485,
+    "longitude": 174.7633
+  },
+  "areaServed": [
+    {
+      "@type": "City",
+      "name": "Auckland",
+      "sameAs": "https://en.wikipedia.org/wiki/Auckland"
+    },
+    {
+      "@type": "Country",
+      "name": "New Zealand",
+      "sameAs": "https://en.wikipedia.org/wiki/New_Zealand"
+    },
+    {
+      "@type": "City",
+      "name": "Albany"
+    },
+    {
+      "@type": "City",
+      "name": "Takapuna"
+    },
+    {
+      "@type": "City",
+      "name": "North Shore"
+    }
+  ],
+  "contactPoint": [
+    {
+      "@type": "ContactPoint",
+      "telephone": "+64-9-123-4567",
+      "contactType": "sales",
+      "email": "sales@impactwebsites.co.nz",
+      "areaServed": "NZ",
+      "availableLanguage": "English"
+    },
+    {
+      "@type": "ContactPoint",
+      "telephone": "+64-9-123-4568",
+      "contactType": "customer support",
+      "email": "support@impactwebsites.co.nz",
+      "areaServed": "NZ",
+      "availableLanguage": "English"
+    },
+    {
+      "@type": "ContactPoint",
+      "telephone": "+64-9-123-4569",
+      "contactType": "billing",
+      "email": "billing@impactwebsites.co.nz",
+      "areaServed": "NZ",
+      "availableLanguage": "English"
+    }
+  ],
+  "openingHours": [
+    "Mo-Fr 09:00-17:00"
+  ],
+  "sameAs": [
+    "https://www.facebook.com/impactwebsites",
+    "https://www.linkedin.com/company/impact-websites",
+    "https://twitter.com/impactwebsites"
+  ],
+  "hasOfferCatalog": {
+    "@type": "OfferCatalog",
+    "name": "Web Design and Development Services",
+    "itemListElement": [
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Custom Website Design",
+          "description": "Professional custom website design tailored to your brand and business needs in Auckland and throughout New Zealand.",
+          "serviceType": "Web Design",
+          "areaServed": {
+            "@type": "Country",
+            "name": "New Zealand"
+          }
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "Website Hosting",
+          "description": "Reliable and secure website hosting services with 24/7 support for New Zealand businesses.",
+          "serviceType": "Web Hosting",
+          "areaServed": {
+            "@type": "Country",
+            "name": "New Zealand"
+          }
+        }
+      },
+      {
+        "@type": "Offer",
+        "itemOffered": {
+          "@type": "Service",
+          "name": "SEO Services",
+          "description": "Search engine optimization services to improve your online visibility across Auckland and New Zealand.",
+          "serviceType": "SEO",
+          "areaServed": {
+            "@type": "Country",
+            "name": "New Zealand"
+          }
+        }
+      }
+    ]
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": 4.8,
+    "ratingCount": 25,
+    "bestRating": 5,
+    "worstRating": 1
+  },
+  "review": [
+    {
+      "@type": "Review",
+      "author": {
+        "@type": "Person",
+        "name": "John Smith"
+      },
+      "reviewRating": {
+        "@type": "Rating",
+        "ratingValue": 5,
+        "bestRating": 5,
+        "worstRating": 1
+      },
+      "reviewBody": "Excellent service! Impact Websites created a beautiful, professional website for our Auckland business. Highly recommended for web design in New Zealand.",
+      "datePublished": "2024-01-15"
+    },
+    {
+      "@type": "Review",
+      "author": {
+        "@type": "Person",
+        "name": "Sarah Johnson"
+      },
+      "reviewRating": {
+        "@type": "Rating",
+        "ratingValue": 5,
+        "bestRating": 5,
+        "worstRating": 1
+      },
+      "reviewBody": "Great SEO results and responsive support. Our Auckland business has seen significant improvement in search rankings.",
+      "datePublished": "2024-02-20"
+    },
+    {
+      "@type": "Review",
+      "author": {
+        "@type": "Person",
+        "name": "Michael Brown"
+      },
+      "reviewRating": {
+        "@type": "Rating",
+        "ratingValue": 4,
+        "bestRating": 5,
+        "worstRating": 1
+      },
+      "reviewBody": "Good hosting service with reliable uptime. Customer support could be faster but overall very satisfied.",
+      "datePublished": "2024-03-10"
+    }
+  ]
+}
