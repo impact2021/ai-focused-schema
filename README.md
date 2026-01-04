@@ -7,7 +7,8 @@ A WordPress plugin for managing JSON-LD schema with support for page-specific sc
 - Upload and manage JSON-LD schema via WordPress admin
 - Edit schema fields through a user-friendly interface
 - **Page-Specific Schema**: Merge page-specific schema with global schema for individual posts/pages
-- **Automatic Output**: Schema automatically added to page `<head>` for SEO tools and search engines
+- **Automatic Output**: Schema automatically added to page `<head>` for SEO tools and search engines (enabled by default)
+- **Flexible Embedding**: Choose between automatic output or manual shortcode placement - perfect for hard-to-edit sites
 - Manual review management with aggregate rating calculation
 - Output schema via shortcode `[ai_schema]` for use in Divi footer or anywhere in your site
 - **Documentation Page**: Built-in documentation accessible from the admin menu
@@ -35,6 +36,24 @@ To enable automatic updates:
 2. Either upload a complete JSON-LD schema or fill in the individual fields
 3. Schema is automatically added to the page `<head>` section (enabled by default)
 4. Optionally use the shortcode `[ai_schema]` to manually place schema anywhere on your site
+
+### Schema Output Options
+
+You have two ways to add your schema to your website:
+
+#### Automatic Output (Default)
+- Schema is automatically added to every page's `<head>` section
+- Perfect for sites that are hard to edit or where adding shortcodes is difficult
+- Enabled by default - just configure your schema and it works
+- Can be toggled on/off in the **Schema Output Settings** section
+
+#### Manual Shortcode Placement
+- Use the `[ai_schema]` shortcode to place schema exactly where you want
+- Ideal for custom placements (e.g., Divi footer)
+- Can be used alongside or instead of automatic output
+- Simply add `[ai_schema]` to any page, post, or widget
+
+**Note:** If you're using the shortcode and don't want duplicate schema output, disable automatic output in the settings.
 
 ### Page-Specific Schema
 
