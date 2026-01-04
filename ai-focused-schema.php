@@ -927,7 +927,7 @@ update_post_meta( $post_id, '_aifs_page_schema', $schema_json );
  * Display admin notice for invalid JSON schema.
  */
 add_action( 'admin_notices', function() {
-if ( isset( $_GET['aifs_invalid_json'] ) && '1' === $_GET['aifs_invalid_json'] ) {
+if ( isset( $_GET['aifs_invalid_json'] ) && '1' === sanitize_text_field( wp_unslash( $_GET['aifs_invalid_json'] ) ) ) {
 ?>
 <div class="notice notice-error is-dismissible">
 <p><strong>AI Focused Schema:</strong> Invalid JSON in page-specific schema. Please check your JSON syntax and try again.</p>
