@@ -732,13 +732,7 @@ if ( empty( $schema ) ) {
 return '';
 }
 
-$json = wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
-
-if ( ! $json ) {
-return '';
-}
-
-return '<script type="application/ld+json">' . $json . '</script>';
+return aifs_encode_schema_to_script( $schema );
 }
 
 /**
@@ -760,6 +754,20 @@ return '';
 
 // Sanitize the schema data
 $schema = aifs_sanitize_schema_data( $schema );
+
+return aifs_encode_schema_to_script( $schema );
+}
+
+/**
+ * Encode schema array to JSON-LD script tag.
+ *
+ * @param array $schema Schema data array.
+ * @return string HTML script tag with JSON-LD.
+ */
+function aifs_encode_schema_to_script( $schema ) {
+if ( empty( $schema ) ) {
+return '';
+}
 
 $json = wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 
@@ -896,19 +904,35 @@ update_post_meta( $post_id, '_aifs_enable_page_schema', $enabled );
 
 // Save schema JSON
 if ( isset( $_POST['aifs_page_schema'] ) ) {
-$schema_json = wp_unslash( $_POST['aifs_page_schema'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+$schema_json = sanitize_textarea_field( wp_unslash( $_POST['aifs_page_schema'] ) );
 $schema_json = trim( $schema_json );
 
 // Validate JSON if not empty
 if ( ! empty( $schema_json ) ) {
 $parsed = json_decode( $schema_json, true );
 if ( json_last_error() !== JSON_ERROR_NONE ) {
-// Don't save invalid JSON, but don't show error here (could add admin notice)
+// Add admin notice for invalid JSON
+add_filter( 'redirect_post_location', function( $location ) {
+return add_query_arg( 'aifs_invalid_json', '1', $location );
+} );
 return;
 }
 }
 
 update_post_meta( $post_id, '_aifs_page_schema', $schema_json );
+}
+} );
+
+/**
+ * Display admin notice for invalid JSON schema.
+ */
+add_action( 'admin_notices', function() {
+if ( isset( $_GET['aifs_invalid_json'] ) && '1' === $_GET['aifs_invalid_json'] ) {
+?>
+<div class="notice notice-error is-dismissible">
+<p><strong>AI Focused Schema:</strong> Invalid JSON in page-specific schema. Please check your JSON syntax and try again.</p>
+</div>
+<?php
 }
 } );
 
