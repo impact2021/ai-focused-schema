@@ -376,14 +376,14 @@ add_settings_error( 'aifs_messages', 'aifs_fields_success', 'Schema fields updat
 
 // Handle settings update.
 if ( isset( $_POST['aifs_save_settings'] ) ) {
-$nonce = isset( $_POST['aifs_settings_nonce'] ) ? wp_unslash( $_POST['aifs_settings_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+$nonce = isset( $_POST['aifs_settings_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['aifs_settings_nonce'] ) ) : '';
 if ( ! wp_verify_nonce( $nonce, 'aifs_settings_action' ) ) {
 add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
 return;
 }
 
 $settings = array();
-$settings['auto_output'] = isset( $_POST['aifs_auto_output'] ) && $_POST['aifs_auto_output'] === '1';
+$settings['auto_output'] = isset( $_POST['aifs_auto_output'] ) && sanitize_text_field( wp_unslash( $_POST['aifs_auto_output'] ) ) === '1';
 
 update_option( AIFS_SETTINGS_OPTION, $settings );
 add_settings_error( 'aifs_messages', 'aifs_settings_success', 'Settings updated successfully!', 'success' );
@@ -749,6 +749,7 @@ $settings = get_option( AIFS_SETTINGS_OPTION, array() );
 $auto_output = isset( $settings['auto_output'] ) ? $settings['auto_output'] : true;
 
 if ( $auto_output ) {
+// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-LD output is already safely encoded via wp_json_encode() in aifs_build_jsonld()
 echo aifs_build_jsonld() . "\n";
 }
 }, 1 );
