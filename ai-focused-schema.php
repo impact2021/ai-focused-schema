@@ -383,7 +383,7 @@ return;
 }
 
 $settings = array();
-$settings['auto_output'] = isset( $_POST['aifs_auto_output'] ) && sanitize_text_field( wp_unslash( $_POST['aifs_auto_output'] ) ) === '1';
+$settings['auto_output'] = isset( $_POST['aifs_auto_output'] );
 
 update_option( AIFS_SETTINGS_OPTION, $settings );
 add_settings_error( 'aifs_messages', 'aifs_settings_success', 'Settings updated successfully!', 'success' );
