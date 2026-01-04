@@ -20,6 +20,7 @@ if ( file_exists( $github_updater ) ) {
 }
 
 define( 'AIFS_OPTION', 'aifs_schema_data' );
+define( 'AIFS_SETTINGS_OPTION', 'aifs_settings' );
 
 /**
  * Activation: set up default option.
@@ -27,6 +28,10 @@ define( 'AIFS_OPTION', 'aifs_schema_data' );
 register_activation_hook( __FILE__, function() {
 if ( ! get_option( AIFS_OPTION ) ) {
 add_option( AIFS_OPTION, array() );
+}
+if ( ! get_option( AIFS_SETTINGS_OPTION ) ) {
+// Enable automatic output by default
+add_option( AIFS_SETTINGS_OPTION, array( 'auto_output' => true ) );
 }
 } );
 
@@ -368,6 +373,21 @@ $schema[ $key ] = $value;
 update_option( AIFS_OPTION, $schema );
 add_settings_error( 'aifs_messages', 'aifs_fields_success', 'Schema fields updated successfully!', 'success' );
 }
+
+// Handle settings update.
+if ( isset( $_POST['aifs_save_settings'] ) ) {
+$nonce = isset( $_POST['aifs_settings_nonce'] ) ? wp_unslash( $_POST['aifs_settings_nonce'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+if ( ! wp_verify_nonce( $nonce, 'aifs_settings_action' ) ) {
+add_settings_error( 'aifs_messages', 'aifs_nonce_error', 'Security check failed.', 'error' );
+return;
+}
+
+$settings = array();
+$settings['auto_output'] = isset( $_POST['aifs_auto_output'] ) && $_POST['aifs_auto_output'] === '1';
+
+update_option( AIFS_SETTINGS_OPTION, $settings );
+add_settings_error( 'aifs_messages', 'aifs_settings_success', 'Settings updated successfully!', 'success' );
+}
 } );
 
 /**
@@ -379,6 +399,10 @@ return;
 }
 
 $schema = get_option( AIFS_OPTION, array() );
+$settings = get_option( AIFS_SETTINGS_OPTION, array() );
+
+// Extract settings.
+$auto_output = isset( $settings['auto_output'] ) ? $settings['auto_output'] : true;
 
 // Extract common fields for display.
 $context         = isset( $schema['@context'] ) ? $schema['@context'] : 'https://schema.org';
@@ -430,6 +454,31 @@ $json_preview = ! empty( $schema ) ? wp_json_encode( $schema, JSON_PRETTY_PRINT 
 <h1>AI Focused Schema by Impact Websites</h1>
 
 <?php settings_errors( 'aifs_messages' ); ?>
+
+<!-- Settings Section -->
+<div class="aifs-json-upload">
+<h2>Schema Output Settings</h2>
+<form method="post">
+<?php wp_nonce_field( 'aifs_settings_action', 'aifs_settings_nonce' ); ?>
+<table class="form-table">
+<tr>
+<th scope="row">Automatic Schema Output</th>
+<td>
+<label>
+<input type="checkbox" name="aifs_auto_output" value="1" <?php checked( $auto_output, true ); ?> />
+Automatically add schema to page &lt;head&gt; section
+</label>
+<p class="description">
+When enabled, the schema will be automatically added to every page's &lt;head&gt; section. 
+This is useful for sites where adding shortcodes is difficult. 
+You can disable this if you prefer to use the <code>[ai_schema]</code> shortcode instead.
+</p>
+</td>
+</tr>
+</table>
+<?php submit_button( 'Save Settings', 'primary', 'aifs_save_settings' ); ?>
+</form>
+</div>
 
 <div class="aifs-shortcode-info">
 <strong>Shortcode:</strong> Use <code>[ai_schema]</code> in your Divi footer (or anywhere else) to output the schema.
@@ -691,6 +740,18 @@ return '';
 
 return '<script type="application/ld+json">' . $json . '</script>';
 }
+
+/**
+ * Automatically output schema to <head> if enabled.
+ */
+add_action( 'wp_head', function() {
+$settings = get_option( AIFS_SETTINGS_OPTION, array() );
+$auto_output = isset( $settings['auto_output'] ) ? $settings['auto_output'] : true;
+
+if ( $auto_output ) {
+echo aifs_build_jsonld() . "\n";
+}
+}, 1 );
 
 /**
  * Shortcode: [ai_schema]
